@@ -10,9 +10,9 @@ After that just import the library like so
 
     from pytifications import Pytifications
 
-    
+
     #use your credentials created at the bot
-    messenger = Pytifications("myUsername","myPassword")
+    Pytifications.login("myUsername","myPassword")
 
     #and send!
-    messenger.send_message("hello from python!")
+    Pytifications.send_message("hello from python!")
