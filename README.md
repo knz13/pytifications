@@ -15,7 +15,7 @@ And you're done
 First you'll need to create an account at the [pytificator](t.me/pytificator_bot) bot
 
 After that just import the library like so
-
+    
     from pytifications import Pytifications
 
 
@@ -24,3 +24,46 @@ After that just import the library like so
 
     #and send!
     Pytifications.send_message("hello from python!")
+    
+
+## Extra features
+
+* Callbacks
+
+```
+#every message can be sent with buttons attached so you can be responsive with your messages
+
+from pytifications import Pytifications,PytificationButton
+
+#login and etc...
+
+def my_callback_func():
+    print('called!')
+
+Pytifications.send_message('hi!',buttons=[
+    #each column is an inner list
+    [
+        #use the PytificationButton
+        PytificationButton(
+            text="I'm a button!",
+            callback=my_callback_func
+        )
+    ]
+])
+```
+* Edit last message
+```
+from pytifications import Pytifications
+
+#login and etc...
+
+Pytifications.send_message("hi, i'm not edited!")
+
+#simply edit the last message
+Pytifications.edit_last_message("now i am!")
+```
+
+
+    
+    
+
