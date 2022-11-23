@@ -1,3 +1,4 @@
 src/pytifications.egg-info
 dist
 __pycache__
+test.py
