@@ -56,7 +56,7 @@ class Pytifications:
             Pytifications._logged_in = True
             print('success logging in to pytifications!')
 
-        Thread(target=Pytifications._check_if_any_callbacks_to_be_called).start()
+        Thread(target=Pytifications._check_if_any_callbacks_to_be_called,daemon=True).start()
         
         return True
 
@@ -69,6 +69,7 @@ class Pytifications:
                 res = requests.get('https://pytifications.herokuapp.com/get_callbacks',data={
                     "username":Pytifications._login,
                     "password_hash":hashlib.sha256(Pytifications._password.encode('utf-8')).hexdigest(),
+                    "script_name":sys.argv[0]
                 })
             except:
                 pass
@@ -113,7 +114,7 @@ class Pytifications:
 
         print(f'sent message: "{message}"')
 
-    def edit_last_message(newText:str):
+    def edit_last_message(message:str,buttons: List[List[PytificationButton]] = []):
         """
         Use this method to edit the last sent message from this script
 
@@ -125,12 +126,25 @@ class Pytifications:
         """
         if not Pytifications._check_login() or Pytifications._last_message_id == None:
             return False
+
+        requestedButtons = []
+        for row in buttons:
+            rowButtons = []
+            for column in row:
+                Pytifications._registered_callbacks[column.callback.__name__] = column.callback
+                rowButtons.append({
+                    "callback_name":column.callback.__name__,
+                    "text":column.text
+                })
+             
+            requestedButtons.append(rowButtons)
         
         requests.patch('https://pytifications.herokuapp.com/edit_message',data={
             "username":Pytifications._login,
             "password_hash":hashlib.sha256(Pytifications._password.encode('utf-8')).hexdigest(),
-            "message":newText,
-            "message_id":Pytifications._last_message_id
+            "message":message,
+            "message_id":Pytifications._last_message_id,
+            "buttons":requestedButtons
         })
 
         return True
