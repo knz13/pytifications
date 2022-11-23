@@ -30,6 +30,13 @@ class Pytifications:
         Use this method to login to the pytifications network,
 
         if you don't have a login yet, go to https://t.me/pytificator_bot and talk to the bot to create your account
+
+        Args:
+            login (:obj:`str`) your login credentials created at the bot
+            password (:obj:`str`) your password created at the bot
+
+        Returns:
+            :obj:`True`if login was successful else :obj:`False`
         """
 
         Pytifications._logged_in = False
@@ -70,6 +77,16 @@ class Pytifications:
                     Pytifications._registered_callbacks[item]()
 
     def send_message(message: str,buttons: List[List[PytificationButton]] = []):
+        """
+        Use this method to send a message to yourself/your group,
+
+        make sure to have called Pytifications.login() before,
+
+
+        Args:
+            message: (:obj:`str`) message to be sent
+            buttons: (:obj:`List[List[PytificationButton]]`) a list of rows each with a list of columns in that row to be used to align the buttons
+        """
         if not Pytifications._check_login():
             return
 
@@ -96,8 +113,17 @@ class Pytifications:
         print(f'sent message: "{message}"')
 
     def edit_last_message(newText:str):
+        """
+        Use this method to edit the last sent message from this script
+
+        Args:
+            message: (:obj:`str`) message to be sent
+            buttons: (:obj:`List[List[PytificationButton]]`) a list of rows each with a list of columns in that row to be used to align the buttons
+        Returns:
+            :obj:`True` on success and :obj:`False` if no message was sent before
+        """
         if not Pytifications._check_login() or Pytifications._last_message_id == None:
-            return 
+            return False
         
         requests.patch('https://pytifications.herokuapp.com/edit_message',data={
             "username":Pytifications._login,
@@ -105,6 +131,8 @@ class Pytifications:
             "message":newText,
             "message_id":Pytifications._last_message_id
         })
+
+        return True
         
 
     def _check_login():
@@ -115,5 +143,8 @@ class Pytifications:
 
 
     def am_i_logged_in():
+        """
+        Checks if already logged in
+        """
         return Pytifications._logged_in
     

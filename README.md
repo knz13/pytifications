@@ -12,7 +12,7 @@ And you're done
 
 # Usage
 
-First you'll need to create an account at the [pytificator](t.me/pytificator_bot) bot
+First you'll need to create an account at the [pytificator](https://t.me/pytificator_bot) bot
 
 After that just import the library like so
     
