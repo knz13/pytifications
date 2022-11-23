@@ -69,7 +69,7 @@ class Pytifications:
                 for item in json:
                     Pytifications._registered_callbacks[item]()
 
-    def send_message(message: str,buttons: List[List[PytificationButton]]):
+    def send_message(message: str,buttons: List[List[PytificationButton]] = []):
         if not Pytifications._check_login():
             return
 
