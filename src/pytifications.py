@@ -41,11 +41,12 @@ class Pytifications:
 
         Pytifications._logged_in = False
 
-        res = requests.post('https://pytifications.herokuapp.com/send_message',{
+        res = requests.post('https://pytifications.herokuapp.com/initialize_script',{
             "username":login,
             "password_hash":hashlib.sha256(password.encode('utf-8')).hexdigest(),
-            "message":""
+            "script_name":sys.argv[0]
         })
+        
         Pytifications._login = login
         Pytifications._password = password
         if res.status_code != 200:
