@@ -61,6 +61,20 @@ Pytifications.send_message("hi, i'm not edited!")
 
 #simply edit the last message
 Pytifications.edit_last_message("now i am!")
+
+#you can also change the buttons on the message!
+
+def do_something():
+    print('something done!')
+
+Pytifications.edit_last_message("now with buttons!",buttons=[
+    [
+        PytificationButton(
+            text="do something...",
+            callback=do_something
+        )
+    ]
+])
 ```
 
 
