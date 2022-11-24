@@ -41,7 +41,7 @@ class Pytifications:
 
         Pytifications._logged_in = False
 
-        res = requests.post('https://pytifications.herokuapp.com/initialize_script',{
+        res = requests.post('https://pytifications.herokuapp.com/initialize_script',json={
             "username":login,
             "password_hash":hashlib.sha256(password.encode('utf-8')).hexdigest(),
             "script_name":sys.argv[0]
@@ -66,7 +66,7 @@ class Pytifications:
             if not Pytifications.am_i_logged_in():
                 continue
             try:
-                res = requests.get('https://pytifications.herokuapp.com/get_callbacks',data={
+                res = requests.get('https://pytifications.herokuapp.com/get_callbacks',json={
                     "username":Pytifications._login,
                     "password_hash":hashlib.sha256(Pytifications._password.encode('utf-8')).hexdigest(),
                     "script_name":sys.argv[0]
@@ -103,13 +103,15 @@ class Pytifications:
                 })
              
             requestedButtons.append(rowButtons)
-        res = requests.post('https://pytifications.herokuapp.com/send_message',{
+        res = requests.post('https://pytifications.herokuapp.com/send_message',json={
             "username":Pytifications._login,
             "password_hash":hashlib.sha256(Pytifications._password.encode('utf-8')).hexdigest(),
-            "message":f'Message sent from {sys.argv[0]}...\n\n{message}',
+            "message":f'Message sent from python script:\n{sys.argv[0]}...\n\n{message}',
             "buttons":requestedButtons
         })
 
+        if res.status_code != 200:
+            print(f'could not send message. reason: {res.reason}')
         Pytifications._last_message_id = res.json()
 
         print(f'sent message: "{message}"')
@@ -139,10 +141,10 @@ class Pytifications:
              
             requestedButtons.append(rowButtons)
         
-        requests.patch('https://pytifications.herokuapp.com/edit_message',data={
+        requests.patch('https://pytifications.herokuapp.com/edit_message',json={
             "username":Pytifications._login,
             "password_hash":hashlib.sha256(Pytifications._password.encode('utf-8')).hexdigest(),
-            "message":message,
+            "message":f'Message sent from python script:\n{sys.argv[0]}...\n\n{message}',
             "message_id":Pytifications._last_message_id,
             "buttons":requestedButtons
         })
