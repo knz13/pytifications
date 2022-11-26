@@ -23,7 +23,7 @@ class Pytifications:
     _loop = None
     _registered_callbacks = {}
     _last_message_id = 0
-
+    _script_id = 0
 
     def login(login:str,password:str) -> bool:
         """
@@ -44,7 +44,8 @@ class Pytifications:
         res = requests.post('https://pytifications.herokuapp.com/initialize_script',json={
             "username":login,
             "password_hash":hashlib.sha256(password.encode('utf-8')).hexdigest(),
-            "script_name":sys.argv[0]
+            "script_name":sys.argv[0],
+            "script_language":'js'
         })
         
         Pytifications._login = login
@@ -54,7 +55,8 @@ class Pytifications:
             return False
         else:
             Pytifications._logged_in = True
-            print('success logging in to pytifications!')
+            Pytifications._script_id = res.text
+            print(f'success logging in to pytifications! script id = {Pytifications._script_id}')
 
         Thread(target=Pytifications._check_if_any_callbacks_to_be_called,daemon=True).start()
         
@@ -69,7 +71,7 @@ class Pytifications:
                 res = requests.get('https://pytifications.herokuapp.com/get_callbacks',json={
                     "username":Pytifications._login,
                     "password_hash":hashlib.sha256(Pytifications._password.encode('utf-8')).hexdigest(),
-                    "script_name":sys.argv[0]
+                    "script_id":Pytifications._script_id
                 })
             except:
                 pass
@@ -106,13 +108,16 @@ class Pytifications:
         res = requests.post('https://pytifications.herokuapp.com/send_message',json={
             "username":Pytifications._login,
             "password_hash":hashlib.sha256(Pytifications._password.encode('utf-8')).hexdigest(),
-            "message":f'Message sent from python script:\n{sys.argv[0]}...\n\n{message}',
-            "buttons":requestedButtons
+            "message":message,
+            "buttons":requestedButtons,
+            "script_id":Pytifications._script_id
         })
 
         if res.status_code != 200:
             print(f'could not send message. reason: {res.reason}')
-        Pytifications._last_message_id = res.json()
+            return 
+
+        Pytifications._last_message_id = int(res.text)
 
         print(f'sent message: "{message}"')
 
@@ -144,9 +149,10 @@ class Pytifications:
         requests.patch('https://pytifications.herokuapp.com/edit_message',json={
             "username":Pytifications._login,
             "password_hash":hashlib.sha256(Pytifications._password.encode('utf-8')).hexdigest(),
-            "message":f'Message sent from python script:\n{sys.argv[0]}...\n\n{message}',
+            "message":message,
             "message_id":Pytifications._last_message_id,
-            "buttons":requestedButtons
+            "buttons":requestedButtons,
+            "script_id":Pytifications._script_id
         })
 
         return True
