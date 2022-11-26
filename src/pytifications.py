@@ -15,6 +15,54 @@ class PytificationButton:
     callback: Callable
 
 
+class PytificationsMessage:
+    def __init__(self,message_id):
+
+        self._message_id = message_id
+
+    def edit(self,text: str = "",buttons: List[List[PytificationButton]] =[]): 
+        """
+        Method to edit this message in Telegram
+
+        if only the buttons are passed, the text will be kept the same
+
+        Args:
+            text: (:obj:`str`) message to send instead
+            buttons: (:obj:`List[List[PytificationButton]]`) a list of rows each with a list of columns in that row to be used to align the buttons
+        Returns:
+            :obj:`True` on success and :obj:`False` if no message was sent before
+        """
+
+        if not Pytifications._check_login():
+            return False
+
+        requestedButtons = []
+        for row in buttons:
+            rowButtons = []
+            for column in row:
+                Pytifications._registered_callbacks[column.callback.__name__] = column.callback
+                rowButtons.append({
+                    "callback_name":column.callback.__name__,
+                    "text":column.text
+                })
+             
+            requestedButtons.append(rowButtons)
+
+        request_data = {
+            "username":Pytifications._login,
+            "password_hash":hashlib.sha256(Pytifications._password.encode('utf-8')).hexdigest(),
+            "message_id":self._message_id,
+            "buttons":requestedButtons,
+            "script_id":Pytifications._script_id
+        }
+
+        if text != "":
+            request_data["message"] = text
+        
+        requests.patch('https://pytifications.herokuapp.com/edit_message',json=request_data)
+
+        return True
+
 
 class Pytifications:
     _login = None
@@ -90,9 +138,11 @@ class Pytifications:
         Args:
             message: (:obj:`str`) message to be sent
             buttons: (:obj:`List[List[PytificationButton]]`) a list of rows each with a list of columns in that row to be used to align the buttons
+        Return:
+            False if any errors ocurred or :obj:`PytificationsMessage` if successful
         """
         if not Pytifications._check_login():
-            return
+            return False
 
         requestedButtons = []
         for row in buttons:
@@ -115,15 +165,19 @@ class Pytifications:
 
         if res.status_code != 200:
             print(f'could not send message. reason: {res.reason}')
-            return 
+            return False
 
         Pytifications._last_message_id = int(res.text)
 
         print(f'sent message: "{message}"')
 
-    def edit_last_message(message:str,buttons: List[List[PytificationButton]] = []):
+        return PytificationsMessage(int(res.text))
+
+    def edit_last_message(message:str = "",buttons: List[List[PytificationButton]] = []):
         """
         Use this method to edit the last sent message from this script
+
+        if only the buttons are passed, the text will be kept the same
 
         Args:
             message: (:obj:`str`) message to be sent
@@ -146,14 +200,18 @@ class Pytifications:
              
             requestedButtons.append(rowButtons)
         
-        requests.patch('https://pytifications.herokuapp.com/edit_message',json={
+        request_data = {
             "username":Pytifications._login,
             "password_hash":hashlib.sha256(Pytifications._password.encode('utf-8')).hexdigest(),
-            "message":message,
             "message_id":Pytifications._last_message_id,
             "buttons":requestedButtons,
             "script_id":Pytifications._script_id
-        })
+        }
+
+        if message != "":
+            request_data["message"] = message
+        
+        requests.patch('https://pytifications.herokuapp.com/edit_message',json=request_data)
 
         return True
         

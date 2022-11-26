@@ -51,6 +51,30 @@ Pytifications.send_message('hi!',buttons=[
     ]
 ])
 ```
+* Editting messages
+```
+message = Pytifications.send_message('message sent from Pytifications!')
+
+#you can simply edit the text
+message.edit(text="Edited text")
+
+#or add buttons (if only the buttons are passed, the message will be kept the same)!
+def some_callback():
+    pass
+
+message.edit(buttons=[
+    [
+        PytificationsButton(
+            text="some callback :D",
+            callback=some_callback
+        )
+    ]
+])
+
+
+```
+
+
 * Edit last message
 ```
 from pytifications import Pytifications
@@ -59,7 +83,7 @@ from pytifications import Pytifications
 
 Pytifications.send_message("hi, i'm not edited!")
 
-#simply edit the last message
+#simply edit the last message from anywhere!
 Pytifications.edit_last_message("now i am!")
 
 #you can also change the buttons on the message!
