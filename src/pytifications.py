@@ -93,7 +93,7 @@ class Pytifications:
             "username":login,
             "password_hash":hashlib.sha256(password.encode('utf-8')).hexdigest(),
             "script_name":sys.argv[0],
-            "script_language":'js'
+            "script_language":'python'
         })
         
         Pytifications._login = login
