@@ -116,7 +116,6 @@ class Pytifications:
             if not Pytifications.am_i_logged_in():
                 continue
             try:
-                print('trying to get callbacks!')
                 res = requests.get('https://pytifications.herokuapp.com/get_callbacks',json={
                     "username":Pytifications._login,
                     "password_hash":hashlib.sha256(Pytifications._password.encode('utf-8')).hexdigest(),
