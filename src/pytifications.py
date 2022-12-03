@@ -5,7 +5,7 @@ import hashlib
 import sys
 import asyncio
 from dataclasses import dataclass
-from threading import Thread
+from multiprocessing import Process
 
 import time
 
@@ -106,7 +106,7 @@ class Pytifications:
             Pytifications._script_id = res.text
             print(f'success logging in to pytifications! script id = {Pytifications._script_id}')
 
-        Thread(target=Pytifications._check_if_any_callbacks_to_be_called,daemon=True).start()
+        Process(target=Pytifications._check_if_any_callbacks_to_be_called,daemon=True).start()
         
         return True
 
