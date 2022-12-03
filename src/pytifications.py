@@ -121,8 +121,9 @@ class Pytifications:
                     "password_hash":hashlib.sha256(Pytifications._password.encode('utf-8')).hexdigest(),
                     "script_id":Pytifications._script_id
                 })
-            except:
-                pass
+            except Exception as e:
+                print(e)
+                continue
             if res.status_code == 200:
                 json = res.json()
                 for item in json:
