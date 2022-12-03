@@ -5,7 +5,7 @@ import hashlib
 import sys
 import asyncio
 from dataclasses import dataclass
-from multiprocessing import Process
+from threading import Thread
 
 import time
 
@@ -106,16 +106,17 @@ class Pytifications:
             Pytifications._script_id = res.text
             print(f'success logging in to pytifications! script id = {Pytifications._script_id}')
 
-        Process(target=Pytifications._check_if_any_callbacks_to_be_called,daemon=True).start()
+        Thread(target=Pytifications._check_if_any_callbacks_to_be_called,daemon=True).start()
         
         return True
 
     def _check_if_any_callbacks_to_be_called():
         while True:
-            time.sleep(1)
+            time.sleep(3)
             if not Pytifications.am_i_logged_in():
                 continue
             try:
+                print('trying to get callbacks!')
                 res = requests.get('https://pytifications.herokuapp.com/get_callbacks',json={
                     "username":Pytifications._login,
                     "password_hash":hashlib.sha256(Pytifications._password.encode('utf-8')).hexdigest(),
