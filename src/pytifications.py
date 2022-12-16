@@ -1,4 +1,5 @@
 
+import datetime
 from typing import List,Callable
 import requests
 import hashlib
@@ -64,6 +65,8 @@ class PytificationsMessage:
         return True
 
 
+
+
 class Pytifications:
     _login = None
     _logged_in = False
@@ -72,7 +75,8 @@ class Pytifications:
     _registered_callbacks = {}
     _last_message_id = 0
     _script_id = 0
-
+    
+   
     def login(login:str,password:str) -> bool:
         """
         Use this method to login to the pytifications network,
@@ -89,12 +93,16 @@ class Pytifications:
 
         Pytifications._logged_in = False
 
-        res = requests.post('https://pytifications.herokuapp.com/initialize_script',json={
-            "username":login,
-            "password_hash":hashlib.sha256(password.encode('utf-8')).hexdigest(),
-            "script_name":sys.argv[0],
-            "script_language":'python'
-        })
+        try:
+            res = requests.post('https://pytifications.herokuapp.com/initialize_script',json={
+                "username":login,
+                "password_hash":hashlib.sha256(password.encode('utf-8')).hexdigest(),
+                "script_name":sys.argv[0],
+                "script_language":'python'
+            })
+        except Exception as e:
+            print(f'Found exception while logging in: {e}')
+            return False
         
         Pytifications._login = login
         Pytifications._password = password
@@ -109,6 +117,8 @@ class Pytifications:
         Thread(target=Pytifications._check_if_any_callbacks_to_be_called,daemon=True).start()
         
         return True
+
+    
 
     def _check_if_any_callbacks_to_be_called():
         while True:
@@ -156,13 +166,17 @@ class Pytifications:
                 })
              
             requestedButtons.append(rowButtons)
-        res = requests.post('https://pytifications.herokuapp.com/send_message',json={
-            "username":Pytifications._login,
-            "password_hash":hashlib.sha256(Pytifications._password.encode('utf-8')).hexdigest(),
-            "message":message,
-            "buttons":requestedButtons,
-            "script_id":Pytifications._script_id
-        })
+        try:
+            res = requests.post('https://pytifications.herokuapp.com/send_message',json={
+                "username":Pytifications._login,
+                "password_hash":hashlib.sha256(Pytifications._password.encode('utf-8')).hexdigest(),
+                "message":message,
+                "buttons":requestedButtons,
+                "script_id":Pytifications._script_id
+            })
+        except Exception as e:
+            print(f"Found error when sending message: {e}")
+            return False
 
         if res.status_code != 200:
             print(f'could not send message. reason: {res.reason}')
@@ -212,7 +226,11 @@ class Pytifications:
         if message != "":
             request_data["message"] = message
         
-        requests.patch('https://pytifications.herokuapp.com/edit_message',json=request_data)
+        try:
+            requests.patch('https://pytifications.herokuapp.com/edit_message',json=request_data)
+        except Exception as e:
+            print(f'Found exception while editing message: {e}')
+            return False
 
         return True
         
