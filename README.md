@@ -28,6 +28,18 @@ After that just import the library like so
 
 ## Extra features
 
+* Sending images
+
+```
+from pytifications import Pytifications
+from PIL import Image
+
+#login and etc...
+
+Pytifications.send_message("hi! i have a photo with me :D",photo=Image.open("image_location.png"))
+
+```
+
 * Callbacks
 
 ```
@@ -37,7 +49,10 @@ from pytifications import Pytifications,PytificationButton
 
 #login and etc...
 
-def my_callback_func():
+
+#the callbacks receive an instance of the message (PytificationsMessage or PytificationsMessageWithPhoto) that was sent so you can change it if you want
+
+def my_callback_func(message):
     print('called!')
 
 Pytifications.send_message('hi!',buttons=[
@@ -51,7 +66,7 @@ Pytifications.send_message('hi!',buttons=[
     ]
 ])
 ```
-* Editting messages
+* Editing messages
 ```
 message = Pytifications.send_message('message sent from Pytifications!')
 
@@ -87,6 +102,7 @@ Pytifications.send_message("hi, i'm not edited!")
 Pytifications.edit_last_message("now i am!")
 
 #you can also change the buttons on the message!
+
 
 def do_something():
     print('something done!')
