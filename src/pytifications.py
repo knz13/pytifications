@@ -87,8 +87,12 @@ class PytificationsMessageWithPhoto:
         if text != "":
             request_data["message"] = text
         
-        print(f'edited message with id {self._message_id} to "{text}"')        
-        requests.patch('https://pytifications.herokuapp.com/edit_message',json=request_data)
+        try:     
+            requests.patch('https://pytifications.herokuapp.com/edit_message',json=request_data)
+        except Exception as e:
+            print(f'Found exception while editing message: {e}')
+            return False
+        print(f'edited message with id {self._message_id} to "{text}"')   
         
         return True
 
@@ -141,8 +145,14 @@ class PytificationsMessage:
             request_data["message"] = text
         
         
-        requests.patch('https://pytifications.herokuapp.com/edit_message',json=request_data)
+        try:     
+            requests.patch('https://pytifications.herokuapp.com/edit_message',json=request_data)
+        except Exception as e:
+            print(f'Found exception while editing message: {e}')
+            return False
 
+        print(f'edited message with id {self._message_id} to "{text}"')   
+        
         return True
 
 
