@@ -341,11 +341,14 @@ class Pytifications:
         if not Pytifications._check_login() or Pytifications._last_message_id == None:
             return False
 
+
+        
         requestedButtons = []
+        message_return = PytificationsMessage()
         for row in buttons:
             rowButtons = []
             for column in row:
-                Pytifications._registered_callbacks[column.callback.__name__] = {"function":column.callback,"args":self}
+                Pytifications._registered_callbacks[column.callback.__name__] = {"function":column.callback,"args":[message_return]}
                 rowButtons.append({
                     "callback_name":column.callback.__name__,
                     "text":column.text
@@ -366,13 +369,16 @@ class Pytifications:
         if message != "":
             request_data["message"] = message
         try:
-            requests.patch('https://pytifications.herokuapp.com/edit_message',json=request_data)
+            res = requests.patch('https://pytifications.herokuapp.com/edit_message',json=request_data)
+
+            if res.status_code == 200:
+                message_return.set_message_id(int(res.text))
         except Exception as e:
             print(f'Found exception while editing message: {e}')
 
             return False
 
-        return True
+        return message_return
         
 
     def _check_login():
