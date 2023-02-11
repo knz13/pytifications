@@ -71,7 +71,7 @@ class PytificationsMessageWithPhoto:
         for row in buttons:
             rowButtons = []
             for column in row:
-                Pytifications._registered_callbacks[column.callback.__name__] = {"function":column.callback,"args":self}
+                Pytifications._registered_callbacks[column.callback.__name__] = {"function":column.callback,"args":[self]}
                 rowButtons.append({
                     "callback_name":column.callback.__name__,
                     "text":column.text
@@ -139,7 +139,7 @@ class PytificationsMessage:
         for row in buttons:
             rowButtons = []
             for column in row:
-                Pytifications._registered_callbacks[column.callback.__name__] =  {"function":column.callback,"args":self}
+                Pytifications._registered_callbacks[column.callback.__name__] =  {"function":column.callback,"args":[self]}
                 rowButtons.append({
                     "callback_name":column.callback.__name__,
                     "text":column.text
