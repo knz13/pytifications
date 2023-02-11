@@ -29,6 +29,8 @@ def image_to_byte_array(image: Image.Image) -> str:
     image.save(mem_file, "PNG", quality=100)
     return list(bytearray(mem_file.getvalue()))
 
+alive_messages = []
+
 @dataclass
 class PytificationButton:
     text: str
@@ -38,6 +40,13 @@ class PytificationsMessageWithPhoto:
     def __init__(self,message_id = -1,image = None):
         self._image = image
         self._message_id = message_id
+        alive_messages.append(self)
+    def __del__(self):
+        if self in alive_messages:
+            alive_messages.remove(self)
+
+    def set_message_id(self,id):
+        self._message_id = id
 
     def edit(self,text: str = "",buttons: List[List[PytificationButton]] =[],photo: Image.Image = None): 
         """
@@ -102,6 +111,13 @@ class PytificationsMessage:
     def __init__(self,message_id=-1):
 
         self._message_id = message_id
+        alive_messages.append(self)
+    def __del__(self):
+        if self in alive_messages:
+            alive_messages.remove(self)
+
+    def set_message_id(self,id):
+        self._message_id = id
 
     def edit(self,text: str = "",buttons: List[List[PytificationButton]] =[]): 
         """
@@ -157,13 +173,25 @@ class PytificationsMessage:
 
 
 
+class PytificationsRemoteController:
+    def __init__(self,name) -> None:
+        pass
+
+def update_message_id(old_message_id,new_message_id):
+
+
+    for i in alive_messages:
+        if int(i._message_id) == int(old_message_id):
+            i.set_message_id(str(new_message_id))
 
 class Pytifications:
     _login = None
     _logged_in = False
     _password = None
     _loop = None
-    _registered_callbacks = {}
+    _registered_callbacks = {
+        "__set_message_id":{"function":update_message_id,"args":[]}
+    }
     _last_message_id = 0
     _process_id = 0
     
@@ -228,7 +256,8 @@ class Pytifications:
             if res.status_code == 200:
                 json = res.json()
                 for item in json:
-                    Pytifications._registered_callbacks[item]["function"](Pytifications._registered_callbacks[item]['args'])
+                    Pytifications._registered_callbacks[item["function"]]["function"](*(Pytifications._registered_callbacks[item['function']]['args'] + item["args"]))
+                    
 
     def send_message(message: str,buttons: List[List[PytificationButton]] = [],photo : Image.Image=None):
         """
@@ -256,7 +285,7 @@ class Pytifications:
         for row in buttons:
             rowButtons = []
             for column in row:
-                Pytifications._registered_callbacks[column.callback.__name__] = {"function":column.callback,"args":returnData}
+                Pytifications._registered_callbacks[column.callback.__name__] = {"function":column.callback,"args":[returnData]}
                 rowButtons.append({
                     "callback_name":column.callback.__name__,
                     "text":column.text
@@ -288,11 +317,11 @@ class Pytifications:
         Pytifications._last_message_id = int(res.text)
 
         
-        returnData._message_id = int(res.text)
+        returnData.set_message_id(int(res.text))
         if photo != None:
             print(f'sent message with photo: "{message}"')
             returnData._image = photo
-        
+
         else:
             print(f'sent message: "{message}"')
         return returnData
@@ -359,3 +388,6 @@ class Pytifications:
         """
         return Pytifications._logged_in
     
+
+    def enable_remote_control(name):
+        return PytificationsRemoteController(name)
