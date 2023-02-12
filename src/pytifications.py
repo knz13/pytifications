@@ -13,21 +13,29 @@ import io
 
 import time
 
-
-def numpy_to_bytes(arr: np.array) -> bytearray:
-    arr_dtype = bytearray(str(arr.dtype), 'utf-8')
-    arr_shape = bytearray(','.join([str(a) for a in arr.shape]), 'utf-8')
-    sep = bytearray('|', 'utf-8')
-    arr_bytes = arr.ravel().tobytes()
-    to_return = arr_dtype + sep + arr_shape + sep + arr_bytes
-    return to_return
-
 def image_to_byte_array(image: Image.Image) -> str:
   # BytesIO is a fake file stored in memory
     mem_file = io.BytesIO()
     image = image.resize((512,512))
     image.save(mem_file, "PNG", quality=100)
     return list(bytearray(mem_file.getvalue()))
+
+def buttons_transform(buttons):
+    requestedButtons = []
+    actual_buttons = []
+    for row in buttons:
+        rowButtons = []
+        for column in row:
+            
+            
+            rowButtons.append({
+                "callback_name":column.callback.__name__,
+                "text":column.text
+            })
+            actual_buttons.append(column)
+            
+        requestedButtons.append(rowButtons)
+    return requestedButtons,actual_buttons
 
 alive_messages = []
 
@@ -39,6 +47,7 @@ class PytificationButton:
 class PytificationsMessageWithPhoto:
     def __init__(self,message_id = -1,image = None):
         self._image = image
+
         self._message_id = message_id
         alive_messages.append(self)
     def __del__(self):
@@ -67,23 +76,17 @@ class PytificationsMessageWithPhoto:
         if not Pytifications._check_login():
             return False
 
-        requestedButtons = []
-        for row in buttons:
-            rowButtons = []
-            for column in row:
-                Pytifications._registered_callbacks[column.callback.__name__] = {"function":column.callback,"args":[self]}
-                rowButtons.append({
-                    "callback_name":column.callback.__name__,
-                    "text":column.text
-                })
-             
-            requestedButtons.append(rowButtons)
+
+        buttons,buttons_list = buttons_transform(buttons)
+        for button in buttons_list:
+            Pytifications._registered_callbacks[button.callback.__name__] = {"function":button.callback,"args":[self]}
+        
 
         request_data = {
             "username":Pytifications._login,
             "password_hash":hashlib.sha256(Pytifications._password.encode('utf-8')).hexdigest(),
             "message_id":self._message_id,
-            "buttons":requestedButtons,
+            "buttons":buttons,
             "process_id":Pytifications._process_id
         }
 
@@ -135,23 +138,16 @@ class PytificationsMessage:
         if not Pytifications._check_login():
             return False
 
-        requestedButtons = []
-        for row in buttons:
-            rowButtons = []
-            for column in row:
-                Pytifications._registered_callbacks[column.callback.__name__] =  {"function":column.callback,"args":[self]}
-                rowButtons.append({
-                    "callback_name":column.callback.__name__,
-                    "text":column.text
-                })
-             
-            requestedButtons.append(rowButtons)
+        buttons,buttons_list = buttons_transform(buttons)
+        for button in buttons_list:
+            Pytifications._registered_callbacks[button.callback.__name__] = {"function":button.callback,"args":[self]}
+        
 
         request_data = {
             "username":Pytifications._login,
             "password_hash":hashlib.sha256(Pytifications._password.encode('utf-8')).hexdigest(),
             "message_id":self._message_id,
-            "buttons":requestedButtons,
+            "buttons":buttons,
             "process_id":Pytifications._process_id
         }
 
@@ -195,7 +191,7 @@ class Pytifications:
     _last_message_id = 0
     _process_id = 0
     
-   
+    @staticmethod
     def login(login:str,password:str) -> bool:
         """
         Use this method to login to the pytifications network,
@@ -238,7 +234,7 @@ class Pytifications:
         return True
 
     
-
+    @staticmethod
     def _check_if_any_callbacks_to_be_called():
         while True:
             time.sleep(3)
@@ -259,6 +255,7 @@ class Pytifications:
                     Pytifications._registered_callbacks[item["function"]]["function"](*(Pytifications._registered_callbacks[item['function']]['args'] + item["args"]))
                     
 
+    @staticmethod
     def send_message(message: str,buttons: List[List[PytificationButton]] = [],photo : Image.Image=None):
         """
         Use this method to send a message to yourself/your group,
@@ -281,23 +278,16 @@ class Pytifications:
         if photo != None:
             returnData = PytificationsMessageWithPhoto()
 
-        requestedButtons = []
-        for row in buttons:
-            rowButtons = []
-            for column in row:
-                Pytifications._registered_callbacks[column.callback.__name__] = {"function":column.callback,"args":[returnData]}
-                rowButtons.append({
-                    "callback_name":column.callback.__name__,
-                    "text":column.text
-                })
-            
-            requestedButtons.append(rowButtons)
+        buttons,buttons_list = buttons_transform(buttons)
+        for button in buttons_list:
+            Pytifications._registered_callbacks[button.callback.__name__] = {"function":button.callback,"args":[returnData]}
+        
 
         request_data = {
                 "username":Pytifications._login,
                 "password_hash":hashlib.sha256(Pytifications._password.encode('utf-8')).hexdigest(),
                 "message":message,
-                "buttons":requestedButtons,
+                "buttons":buttons,
                 "process_id":Pytifications._process_id
         }
 
@@ -326,6 +316,8 @@ class Pytifications:
             print(f'sent message: "{message}"')
         return returnData
 
+
+    @staticmethod
     def edit_last_message(message:str = "",buttons: List[List[PytificationButton]] = []):
         """
         Use this method to edit the last sent message from this script
@@ -343,24 +335,18 @@ class Pytifications:
 
 
         
-        requestedButtons = []
         message_return = PytificationsMessage()
-        for row in buttons:
-            rowButtons = []
-            for column in row:
-                Pytifications._registered_callbacks[column.callback.__name__] = {"function":column.callback,"args":[message_return]}
-                rowButtons.append({
-                    "callback_name":column.callback.__name__,
-                    "text":column.text
-                })
-             
-            requestedButtons.append(rowButtons)
+
+
+        buttons,buttons_list = buttons_transform(buttons)
+        for button in buttons_list:
+            Pytifications._registered_callbacks[button.callback.__name__] = {"function":button.callback,"args":[message_return]}
         
         request_data = {
             "username":Pytifications._login,
             "password_hash":hashlib.sha256(Pytifications._password.encode('utf-8')).hexdigest(),
             "message_id":Pytifications._last_message_id,
-            "buttons":requestedButtons,
+            "buttons":buttons,
             "process_id":Pytifications._process_id
         }
 
@@ -380,20 +366,20 @@ class Pytifications:
 
         return message_return
         
-
+    @staticmethod
     def _check_login():
         if not Pytifications._logged_in:
             print('could not send pynotification, make sure you have called Pytifications.login("username","password")')
             return False
         return True
 
-
+    @staticmethod
     def am_i_logged_in():
         """
         Checks if already logged in
         """
         return Pytifications._logged_in
     
-
+    @staticmethod
     def enable_remote_control(name):
         return PytificationsRemoteController(name)
