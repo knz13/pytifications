@@ -24,7 +24,6 @@ After that just import the library like so
 
     #and send!
     Pytifications.send_message("hello from python!")
-    
 
 ## Extra features
 
@@ -55,6 +54,9 @@ from pytifications import Pytifications,PytificationButton
 def my_callback_func(message):
     print('called!')
 
+    #if you want you can also edit the message
+    message.edit("i was changed by a callback :)")
+
 Pytifications.send_message('hi!',buttons=[
     #each column is an inner list
     [
@@ -65,6 +67,15 @@ Pytifications.send_message('hi!',buttons=[
         )
     ]
 ])
+
+# By default the callbacks will be called asynchronously whenever the server receives the signal that the button was pressed, you can override this if you want, like so:
+
+#setting synchronous mode
+Pytifications.set_synchronous()
+
+#then just call this method in the main loop of your program when you wish the callbacks to be called
+Pytifications.run_callbacks_sync()
+
 ```
 * Editing messages
 ```

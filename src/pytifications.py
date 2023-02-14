@@ -64,7 +64,7 @@ class PytificationsMessageWithPhoto:
         if only the buttons are passed, the text will be kept the same
 
         if no photo is passed, the old one will be kept
-
+        
         Args:
             text: (:obj:`str`) message to send instead
             buttons: (:obj:`List[List[PytificationButton]]`) a list of rows each with a list of columns in that row to be used to align the buttons
@@ -190,6 +190,44 @@ class Pytifications:
     }
     _last_message_id = 0
     _process_id = 0
+    _callbacks_to_call_synchronous = []
+    _synchronous = False
+
+    @staticmethod
+    def run_callbacks_sync():
+        """
+        Use this method to run all the callbacks that were registered to be called since last time you called this function or started the process
+        
+        Returns:
+            :obj:`True` if any callbacks where called, :obj:`False` otherwise
+        """
+        
+        called_any = False
+        for callback in Pytifications._callbacks_to_call_synchronous:
+            called_any = True
+            callback["function"](*callback["args"])
+        Pytifications._callbacks_to_call_synchronous.clear()
+
+        return called_any
+    
+    @staticmethod
+    def set_synchronous():
+        """
+        Use this method to set the callbacks registered in buttons to be called synchronously*
+        
+        *when you call the function Pytifications.run_callbacks_sync()
+        """
+
+        Pytifications._synchronous = True
+
+    @staticmethod
+    def set_asynchronous():
+        """
+        Use this method to set the callbacks registered in buttons to be called asynchronously whenever the process receives the request to call them
+
+        This is the default option
+        """
+        Pytifications._synchronous = False
     
     @staticmethod
     def login(login:str,password:str) -> bool:
@@ -252,7 +290,13 @@ class Pytifications:
             if res.status_code == 200:
                 json = res.json()
                 for item in json:
-                    Pytifications._registered_callbacks[item["function"]]["function"](*(Pytifications._registered_callbacks[item['function']]['args'] + item["args"]))
+                    if Pytifications._synchronous:
+                        Pytifications._callbacks_to_call_synchronous.append({
+                            "function":Pytifications._registered_callbacks[item["function"]]["function"],
+                            "args":(Pytifications._registered_callbacks[item['function']]['args'] + item["args"])
+                        })
+                    else:
+                        Pytifications._registered_callbacks[item["function"]]["function"](*(Pytifications._registered_callbacks[item['function']]['args'] + item["args"]))
                     
 
     @staticmethod
