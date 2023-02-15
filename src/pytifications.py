@@ -182,14 +182,13 @@ def update_message_id(old_message_id,new_message_id):
         if int(i._message_id) == int(old_message_id):
             i._message_id = (str(new_message_id))
 
-def datetime_diff(diff):
-
-    days, seconds = diff.days, diff.seconds
-    hours = days * 24 + seconds // 3600
-    minutes = (seconds % 3600) // 60
-    seconds = seconds % 60
-
-    return f"{'{:02d}'.format(hours)}:{'{:02d}'.format(minutes)}:{'{:02d}'.format(seconds)}"
+def datetime_diff(diff: datetime.timedelta):
+    format = "%H:%M:%S"
+    if diff > datetime.timedelta(hours=24):
+        format = f'%j {"days" if diff > datetime.timedelta(hours=48) else "day"} %H:%M:%S'
+        diff -= datetime.timedelta(hours=24)
+    diff = diff + datetime.timedelta(hours=3)
+    return datetime.datetime.fromtimestamp(diff.total_seconds()).strftime(format)
 
 class PytificationsOptions:
     _start_time = datetime.datetime.now()
@@ -213,9 +212,9 @@ class PytificationsOptions:
         if self._send_app_run_time_on_message or self._send_current_time_on_message:
             string = f'{string}\n'
         if self._send_app_run_time_on_message:
-            string = f'{string}\nrun_time:      {datetime_diff(datetime.datetime.now() - PytificationsOptions._start_time)}'
+            string = f'{string}\nrun_time:\n{datetime_diff(datetime.datetime.now() - PytificationsOptions._start_time)}'
         if self._send_current_time_on_message:
-            string = f'{string}\ncurrent_time: {datetime.datetime.now().strftime("%H:%M:%S")}'
+            string = f'{string}\ncurrent_time:\n{datetime.datetime.now().strftime("%H:%M:%S")}'
 
         if self._script_alias != "":
             string = f'Message sent from "{self._script_alias}":\n\n{string}'
