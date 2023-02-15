@@ -54,8 +54,7 @@ class PytificationsMessageWithPhoto:
         if self in alive_messages:
             alive_messages.remove(self)
 
-    def set_message_id(self,id):
-        self._message_id = id
+    
 
     def edit(self,text: str = "",buttons: List[List[PytificationButton]] =[],photo: Image.Image = None): 
         """
@@ -72,6 +71,8 @@ class PytificationsMessageWithPhoto:
         Returns:
             :obj:`True` on success and :obj:`False` if no message was sent before
         """
+
+        text = Pytifications._options.format_string(text)
 
         if not Pytifications._check_login():
             return False
@@ -119,8 +120,7 @@ class PytificationsMessage:
         if self in alive_messages:
             alive_messages.remove(self)
 
-    def set_message_id(self,id):
-        self._message_id = id
+    
 
     def edit(self,text: str = "",buttons: List[List[PytificationButton]] =[]): 
         """
@@ -134,6 +134,8 @@ class PytificationsMessage:
         Returns:
             :obj:`True` on success and :obj:`False` if no message was sent before
         """
+
+        text = Pytifications._options.format_string(text)
 
         if not Pytifications._check_login():
             return False
@@ -178,7 +180,33 @@ def update_message_id(old_message_id,new_message_id):
 
     for i in alive_messages:
         if int(i._message_id) == int(old_message_id):
-            i.set_message_id(str(new_message_id))
+            i._message_id = (str(new_message_id))
+
+class PytificationsOptions:
+    def __init__(self,send_app_run_time_on_message = False,script_alias = "") -> None:
+        """
+        Data class for the options in Pytifications
+
+        Args:
+            send_app_run_time_on_message: (:obj:`bool`) whether to send the current app runtime on the bottom of messages sent and edits
+            script_alias: (:obj:`str`) alias to use when sending the message. Will appear on the top of the messages as "Message sent from __alias_here__:" 
+        """
+        
+        self._send_app_run_time_on_message = send_app_run_time_on_message
+        self._script_alias = script_alias
+        
+    
+
+    def format_string(self,string):
+        if self._send_app_run_time_on_message:
+            string = f'{string}\n\ncurrent_time: {datetime.datetime.now().strftime("%H:%M:%S")}'
+
+        if self._script_alias != "":
+            string = f'Message sent from "{self._script_alias}":\n\n{string}'
+        
+        return string
+
+
 
 class Pytifications:
     _login = None
@@ -192,6 +220,7 @@ class Pytifications:
     _process_id = 0
     _callbacks_to_call_synchronous = []
     _synchronous = False
+    _options = PytificationsOptions()
 
     @staticmethod
     def run_callbacks_sync():
@@ -209,6 +238,15 @@ class Pytifications:
         Pytifications._callbacks_to_call_synchronous.clear()
 
         return called_any
+    
+    @staticmethod
+    def set_options(options: PytificationsOptions):
+        """
+        Sets the options to use during the script operation,
+        
+        for more information on the available options check :obj:`PytificationsOptions`
+        """
+        Pytifications._options = options
     
     @staticmethod
     def set_synchronous():
@@ -314,6 +352,8 @@ class Pytifications:
         Return:
             False if any errors ocurred, :obj:`PytificationsMessage` if photo is not specified and :obj:`PytificationsMessageWithPhoto` if photo is specified
         """
+        message = Pytifications._options.format_string(message)
+
         if not Pytifications._check_login():
             return False
 
@@ -351,7 +391,7 @@ class Pytifications:
         Pytifications._last_message_id = int(res.text)
 
         
-        returnData.set_message_id(int(res.text))
+        returnData._message_id = int(res.text)
         if photo != None:
             print(f'sent message with photo: "{message}"')
             returnData._image = photo
@@ -377,7 +417,7 @@ class Pytifications:
         if not Pytifications._check_login() or Pytifications._last_message_id == None:
             return False
 
-
+        message = Pytifications._options.format_string(message)
         
         message_return = PytificationsMessage()
 
@@ -402,7 +442,7 @@ class Pytifications:
             res = requests.patch('https://pytifications.herokuapp.com/edit_message',json=request_data)
 
             if res.status_code == 200:
-                message_return.set_message_id(int(res.text))
+                message_return._message_id = int(res.text)
         except Exception as e:
             print(f'Found exception while editing message: {e}')
 
