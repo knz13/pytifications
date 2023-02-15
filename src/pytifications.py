@@ -213,7 +213,7 @@ class PytificationsOptions:
         if self._send_app_run_time_on_message or self._send_current_time_on_message:
             string = f'{string}\n'
         if self._send_app_run_time_on_message:
-            string = f'{string}\nrun_time: {datetime_diff(datetime.datetime.now() - PytificationsOptions._start_time)}'
+            string = f'{string}\nrun_time:     {datetime_diff(datetime.datetime.now() - PytificationsOptions._start_time)}'
         if self._send_current_time_on_message:
             string = f'{string}\ncurrent_time: {datetime.datetime.now().strftime("%H:%M:%S")}'
 
