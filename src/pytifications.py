@@ -182,24 +182,41 @@ def update_message_id(old_message_id,new_message_id):
         if int(i._message_id) == int(old_message_id):
             i._message_id = (str(new_message_id))
 
+def datetime_diff(data1:datetime.datetime,data2:datetime.datetime):
+    diff = data2 - data1
+
+    days, seconds = diff.days, diff.seconds
+    hours = days * 24 + seconds // 3600
+    minutes = (seconds % 3600) // 60
+    seconds = seconds % 60
+
+    return f"{hours}:{minutes}:{seconds}"
+
 class PytificationsOptions:
-    def __init__(self,send_app_run_time_on_message = False,script_alias = "") -> None:
+    _start_time = datetime.datetime.now()
+    def __init__(self,send_current_time_on_message=False,send_app_run_time_on_message = False,script_alias = "") -> None:
         """
         Data class for the options in Pytifications
 
         Args:
             send_app_run_time_on_message: (:obj:`bool`) whether to send the current app runtime on the bottom of messages sent and edits
+            send_current_time_on_message: (:obj:`bool`) whether to send the current time on the bottom of messages sent and edited
             script_alias: (:obj:`str`) alias to use when sending the message. Will appear on the top of the messages as "Message sent from __alias_here__:" 
         """
         
         self._send_app_run_time_on_message = send_app_run_time_on_message
         self._script_alias = script_alias
+        self._send_current_time_on_message = send_current_time_on_message
         
     
 
     def format_string(self,string):
+        if self._send_app_run_time_on_message or self._send_current_time_on_message:
+            string = f'{string}\n'
         if self._send_app_run_time_on_message:
-            string = f'{string}\n\ncurrent_time: {datetime.datetime.now().strftime("%H:%M:%S")}'
+            string = f'{string}\nrun_time: {datetime_diff(datetime.datetime.now() - PytificationsOptions._start_time)}'
+        if self._send_current_time_on_message:
+            string = f'{string}\ncurrent_time: {datetime.datetime.now().strftime("%H:%M:%S")}'
 
         if self._script_alias != "":
             string = f'Message sent from "{self._script_alias}":\n\n{string}'
