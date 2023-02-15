@@ -182,15 +182,14 @@ def update_message_id(old_message_id,new_message_id):
         if int(i._message_id) == int(old_message_id):
             i._message_id = (str(new_message_id))
 
-def datetime_diff(data1:datetime.datetime,data2:datetime.datetime):
-    diff = data2 - data1
+def datetime_diff(diff):
 
     days, seconds = diff.days, diff.seconds
     hours = days * 24 + seconds // 3600
     minutes = (seconds % 3600) // 60
     seconds = seconds % 60
 
-    return f"{hours}:{minutes}:{seconds}"
+    return f"{'{:02d}'.format(hours)}:{'{:02d}'.format(minutes)}:{'{:02d}'.format(seconds)}"
 
 class PytificationsOptions:
     _start_time = datetime.datetime.now()
