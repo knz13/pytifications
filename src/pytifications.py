@@ -269,7 +269,7 @@ def edit_message(request_data,return_data: PytificationsMessage | PytificationsM
         print(f'Found exception while editing message: {e}')
         return False
 
-    print(f'edited message with id {return_data._message_id} to "{request_data["message"]}"')   
+    print(f'edited message with id {return_data._message_id if not isinstance(return_data._message_id,InternalPytificationsQueuedTask) else Pytifications._last_message_id} to "{request_data["message"]}"')   
 
 class Pytifications:
     _login = None
@@ -472,7 +472,6 @@ class Pytifications:
         message = Pytifications._options.format_string(message)
         
 
-
         buttons,buttons_list = buttons_transform(buttons)
         for button in buttons_list:
             Pytifications._registered_callbacks[button.callback.__name__] = {"function":button.callback,"args":[message_return]}
@@ -510,7 +509,7 @@ class Pytifications:
         if not Pytifications._check_login():
             return False
         
-        message_return = PytificationsMessage()
+        message_return = PytificationsMessage(-1)
         task = Pytifications._add_to_message_pool(Pytifications.__edit_last_message,message_return,message,buttons)
         message_return._message_id = task
         
