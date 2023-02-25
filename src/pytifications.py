@@ -9,9 +9,13 @@ from dataclasses import dataclass
 from threading import Thread
 from PIL import Image
 import numpy as np
+from queue import SimpleQueue
 import io
 
 import time
+
+
+
 
 def image_to_byte_array(image: Image.Image) -> str:
   # BytesIO is a fake file stored in memory
@@ -37,7 +41,21 @@ def buttons_transform(buttons):
         requestedButtons.append(rowButtons)
     return requestedButtons,actual_buttons
 
+
+
 alive_messages = []
+
+class InternalPytificationsQueuedTask:
+    def __init__(self,function,extra_functions: list,args:tuple) -> None:
+        self._function = function
+        self._extra_functions = extra_functions
+        self._args = args
+    
+    def evaluate(self):
+        self._function(*self._args)
+        for queued_task in self._extra_functions:
+            queued_task.evaluate()
+
 
 @dataclass
 class PytificationButton:
@@ -45,7 +63,7 @@ class PytificationButton:
     callback: Callable
 
 class PytificationsMessageWithPhoto:
-    def __init__(self,message_id = -1,image = None):
+    def __init__(self,message_id,image = None):
         self._image = image
 
         self._message_id = message_id
@@ -69,15 +87,19 @@ class PytificationsMessageWithPhoto:
             buttons: (:obj:`List[List[PytificationButton]]`) a list of rows each with a list of columns in that row to be used to align the buttons
             photo: (:obj:`PIL.Image`) an image if you wish to change it
         Returns:
-            :obj:`True` on success and :obj:`False` if no message was sent before
+            :obj:`True` if change added to the editing queue and :obj:`False` if an error was found
         """
 
-        text = Pytifications._options.format_string(text)
 
-        if not Pytifications._check_login():
+        if not Pytifications._check_login() or self._message_id == -1:
             return False
+        
+        
+        if isinstance(self._message_id,InternalPytificationsQueuedTask):
+            self._message_id._extra_functions.append(InternalPytificationsQueuedTask(self.edit,[],[self,text,buttons,photo]))
+            return True
 
-
+        text = Pytifications._options.format_string(text)
         buttons,buttons_list = buttons_transform(buttons)
         for button in buttons_list:
             Pytifications._registered_callbacks[button.callback.__name__] = {"function":button.callback,"args":[self]}
@@ -96,23 +118,18 @@ class PytificationsMessageWithPhoto:
             self._image = photo
         else:
             request_data['photo'] = image_to_byte_array(self._image)
-
+        
         if text != "": 
             request_data["message"] = text
         
-        try:     
-            requests.patch('https://pytifications.herokuapp.com/edit_message',json=request_data)
-        except Exception as e:
-            print(f'Found exception while editing message: {e}')
-            return False
-        print(f'edited message with id {self._message_id} to "{text}"')   
+        Pytifications._add_to_message_pool(edit_message,request_data,self)
         
         return True
 
 
 
 class PytificationsMessage:
-    def __init__(self,message_id=-1):
+    def __init__(self,message_id):
 
         self._message_id = message_id
         alive_messages.append(self)
@@ -132,14 +149,18 @@ class PytificationsMessage:
             text: (:obj:`str`) message to send instead
             buttons: (:obj:`List[List[PytificationButton]]`) a list of rows each with a list of columns in that row to be used to align the buttons
         Returns:
-            :obj:`True` on success and :obj:`False` if no message was sent before
+            :obj:`True` if change added to the editing queue and :obj:`False` if an error ocurred
         """
 
-        text = Pytifications._options.format_string(text)
 
-        if not Pytifications._check_login():
+        if not Pytifications._check_login() or self._message_id == -1:
             return False
+        
+        if isinstance(self._message_id,InternalPytificationsQueuedTask):
+            self._message_id._extra_functions.append(InternalPytificationsQueuedTask(self.edit,[],[self,text,buttons]))
+            return True
 
+        text = Pytifications._options.format_string(text)
         buttons,buttons_list = buttons_transform(buttons)
         for button in buttons_list:
             Pytifications._registered_callbacks[button.callback.__name__] = {"function":button.callback,"args":[self]}
@@ -159,13 +180,8 @@ class PytificationsMessage:
             request_data["message"] = text
         
         
-        try:     
-            requests.patch('https://pytifications.herokuapp.com/edit_message',json=request_data)
-        except Exception as e:
-            print(f'Found exception while editing message: {e}')
-            return False
-
-        print(f'edited message with id {self._message_id} to "{text}"')   
+        
+        Pytifications._add_to_message_pool(edit_message,request_data,self)
         
         return True
 
@@ -175,9 +191,9 @@ class PytificationsRemoteController:
     def __init__(self,name) -> None:
         pass
 
+    
+
 def update_message_id(old_message_id,new_message_id):
-
-
     for i in alive_messages:
         if int(i._message_id) == int(old_message_id):
             i._message_id = (str(new_message_id))
@@ -221,7 +237,39 @@ class PytificationsOptions:
         
         return string
 
+def send_message(request_data,photo: Image,return_data: PytificationsMessage | PytificationsMessageWithPhoto):
+    try:
+        res = requests.post('https://pytifications.herokuapp.com/send_message',json=request_data)
+    except Exception as e:
+        print(f"Found error when sending message: {e}")
+        return False
+    
 
+    if res.status_code != 200:
+        print(f'could not send message. reason: {res.reason}')
+        return False
+
+    Pytifications._last_message_id = int(res.text)
+
+    
+    return_data._message_id = int(res.text)
+    if photo != None:
+        print(f'sent message with photo: "{request_data["message"]}"')
+        return_data._image = photo
+
+    else:
+        print(f'sent message: "{request_data["message"]}"')
+
+def edit_message(request_data,return_data: PytificationsMessage | PytificationsMessageWithPhoto):
+
+    
+    try:     
+        requests.patch('https://pytifications.herokuapp.com/edit_message',json=request_data)
+    except Exception as e:
+        print(f'Found exception while editing message: {e}')
+        return False
+
+    print(f'edited message with id {return_data._message_id} to "{request_data["message"]}"')   
 
 class Pytifications:
     _login = None
@@ -229,13 +277,21 @@ class Pytifications:
     _password = None
     _loop = None
     _registered_callbacks = {
-        "__set_message_id":{"function":update_message_id,"args":[]}
+        "__set_message_id":{"function":lambda *args: Pytifications._add_to_message_pool(update_message_id,*args),"args":[]}
     }
+    _message_pool: SimpleQueue[InternalPytificationsQueuedTask] = SimpleQueue()
     _last_message_id = 0
     _process_id = 0
     _callbacks_to_call_synchronous = []
     _synchronous = False
     _options = PytificationsOptions()
+
+    @staticmethod
+    def _add_to_message_pool(function,*args):
+        task = InternalPytificationsQueuedTask(function,[],args)
+        Pytifications._message_pool.put(task)
+
+        return task
 
     @staticmethod
     def run_callbacks_sync():
@@ -328,9 +384,19 @@ class Pytifications:
     @staticmethod
     def _check_if_any_callbacks_to_be_called():
         while True:
-            time.sleep(3)
+            time.sleep(0.5)
             if not Pytifications.am_i_logged_in():
                 continue
+            
+            try:
+                while not Pytifications._message_pool.empty():
+                    Pytifications._message_pool.get().evaluate()
+                    
+            except Exception as e:
+                print(f'Error found while updating message pool, please report to the developer! {e}')
+                pass
+
+            time.sleep(2)
             try:
                 res = requests.get('https://pytifications.herokuapp.com/get_callbacks',json={
                     "username":Pytifications._login,
@@ -338,7 +404,7 @@ class Pytifications:
                     "process_id":Pytifications._process_id
                 })
             except Exception as e:
-                print(e)
+                print(f'Error found while requesting to get callbacks, please contact the developer! {e}')
                 continue
             if res.status_code == 200:
                 json = res.json()
@@ -350,7 +416,10 @@ class Pytifications:
                         })
                     else:
                         Pytifications._registered_callbacks[item["function"]]["function"](*(Pytifications._registered_callbacks[item['function']]['args'] + item["args"]))
-                    
+
+
+
+
 
     @staticmethod
     def send_message(message: str,buttons: List[List[PytificationButton]] = [],photo : Image.Image=None):
@@ -372,14 +441,14 @@ class Pytifications:
         if not Pytifications._check_login():
             return False
 
-        returnData = PytificationsMessage()
+        return_data = PytificationsMessage(-1)
 
         if photo != None:
-            returnData = PytificationsMessageWithPhoto()
+            return_data = PytificationsMessageWithPhoto(-1)
 
         buttons,buttons_list = buttons_transform(buttons)
         for button in buttons_list:
-            Pytifications._registered_callbacks[button.callback.__name__] = {"function":button.callback,"args":[returnData]}
+            Pytifications._registered_callbacks[button.callback.__name__] = {"function":button.callback,"args":[return_data]}
         
 
         request_data = {
@@ -393,48 +462,15 @@ class Pytifications:
         if photo != None:
             request_data['photo'] = image_to_byte_array(photo)
 
-        try:
-            res = requests.post('https://pytifications.herokuapp.com/send_message',json=request_data)
-        except Exception as e:
-            print(f"Found error when sending message: {e}")
-            return False
+        task = Pytifications._add_to_message_pool(send_message,request_data,photo,return_data)
+        return_data._message_id = task
 
-        if res.status_code != 200:
-            print(f'could not send message. reason: {res.reason}')
-            return False
-
-        Pytifications._last_message_id = int(res.text)
-
-        
-        returnData._message_id = int(res.text)
-        if photo != None:
-            print(f'sent message with photo: "{message}"')
-            returnData._image = photo
-
-        else:
-            print(f'sent message: "{message}"')
-        return returnData
-
+        return return_data
 
     @staticmethod
-    def edit_last_message(message:str = "",buttons: List[List[PytificationButton]] = []):
-        """
-        Use this method to edit the last sent message from this script
-
-        if only the buttons are passed, the text will be kept the same
-
-        Args:
-            message: (:obj:`str`) message to be sent
-            buttons: (:obj:`List[List[PytificationButton]]`) a list of rows each with a list of columns in that row to be used to align the buttons
-        Returns:
-            :obj:`True` on success and :obj:`False` if no message was sent before
-        """
-        if not Pytifications._check_login() or Pytifications._last_message_id == None:
-            return False
-
+    def __edit_last_message(message_return: PytificationsMessage | PytificationsMessageWithPhoto,message:str = "",buttons: List[List[PytificationButton]] = []):
         message = Pytifications._options.format_string(message)
         
-        message_return = PytificationsMessage()
 
 
         buttons,buttons_list = buttons_transform(buttons)
@@ -453,15 +489,31 @@ class Pytifications:
 
         if message != "":
             request_data["message"] = message
-        try:
-            res = requests.patch('https://pytifications.herokuapp.com/edit_message',json=request_data)
 
-            if res.status_code == 200:
-                message_return._message_id = int(res.text)
-        except Exception as e:
-            print(f'Found exception while editing message: {e}')
+        task = Pytifications._add_to_message_pool(edit_message,request_data,message_return)
+        message_return._message_id = task
+        
 
+    @staticmethod
+    def edit_last_message(message:str = "",buttons: List[List[PytificationButton]] = []):
+        """
+        Use this method to edit the last sent message from this script
+
+        if only the buttons are passed, the text will be kept the same
+
+        Args:
+            message: (:obj:`str`) message to be sent
+            buttons: (:obj:`List[List[PytificationButton]]`) a list of rows each with a list of columns in that row to be used to align the buttons
+        Returns:
+            :obj:`PytificationsMessage` message object that can be further edited if needed
+        """
+        if not Pytifications._check_login():
             return False
+        
+        message_return = PytificationsMessage()
+        task = Pytifications._add_to_message_pool(Pytifications.__edit_last_message,message_return,message,buttons)
+        message_return._message_id = task
+        
 
         return message_return
         
@@ -481,4 +533,7 @@ class Pytifications:
     
     @staticmethod
     def enable_remote_control(name):
+        """
+        EXPERIMENTAL: DO NOT USE
+        """
         return PytificationsRemoteController(name)
