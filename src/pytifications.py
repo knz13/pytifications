@@ -214,12 +214,14 @@ class PytificationsOptions:
 
         Args:
             send_app_run_time_on_message: (:obj:`bool`) whether to send the current app runtime on the bottom of messages sent and edits
+            
             send_current_time_on_message: (:obj:`bool`) whether to send the current time on the bottom of messages sent and edited
-            script_alias: (:obj:`str`) alias to use when sending the message. Will appear on the top of the messages as "Message sent from __alias_here__:" 
+            
+            script_alias: (:obj:`str`) alias to use when sending the message. Any spaces will be replaced with an underscore. Will appear on the top of the messages as "Message sent from __alias_here__:"  and will be used to send commands to your script
         """
         
         self._send_app_run_time_on_message = send_app_run_time_on_message
-        self._script_alias = script_alias
+        self._script_alias = script_alias.replace(" ","_")
         self._send_current_time_on_message = send_current_time_on_message
         
     
