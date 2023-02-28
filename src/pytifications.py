@@ -17,6 +17,7 @@ import time
 
 
 
+
 def image_to_byte_array(image: Image.Image) -> str:
   # BytesIO is a fake file stored in memory
     mem_file = io.BytesIO()
@@ -363,7 +364,7 @@ class Pytifications:
             res = requests.post('https://pytifications.herokuapp.com/initialize_script',json={
                 "username":login,
                 "password_hash":hashlib.sha256(password.encode('utf-8')).hexdigest(),
-                "process_name":sys.argv[0],
+                "process_name":hashlib.sha256(sys.argv[0].encode('utf-8')).hexdigest()[:10] if Pytifications._options._script_alias == "" else Pytifications._options._script_alias,
                 "process_language":'python'
             })
         except Exception as e:
