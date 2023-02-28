@@ -194,6 +194,8 @@ class PytificationsRemoteController:
     
 
 def update_message_id(old_message_id,new_message_id):
+
+
     for i in alive_messages:
         if int(i._message_id) == int(old_message_id):
             i._message_id = (str(new_message_id))
@@ -410,7 +412,8 @@ class Pytifications:
                 continue
             if res.status_code == 200:
                 json = res.json()
-                for item in json:
+                commands,callbacks = json['commands'],json['callbacks']
+                for item in callbacks:
                     if Pytifications._synchronous:
                         Pytifications._callbacks_to_call_synchronous.append({
                             "function":Pytifications._registered_callbacks[item["function"]]["function"],
@@ -418,7 +421,7 @@ class Pytifications:
                         })
                     else:
                         Pytifications._registered_callbacks[item["function"]]["function"](*(Pytifications._registered_callbacks[item['function']]['args'] + item["args"]))
-
+                
 
 
 
