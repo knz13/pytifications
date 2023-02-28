@@ -276,6 +276,33 @@ def edit_message(request_data,return_data: PytificationsMessage | PytificationsM
 
     print(f'edited message with id {return_data._message_id if not isinstance(return_data._message_id,InternalPytificationsQueuedTask) else Pytifications._last_message_id} to "{request_data["message"]}"')   
 
+def send_registered_commands(extras):
+    message = f'The following commands are registered for the script with alias "{Pytifications._options._script_alias}":'
+
+    message += "\n\nDefault commands:"
+
+    #put the default commands here
+
+    for command in Pytifications._default_commands:
+        message += f'\n\n -> command: {command}\n      description: {Pytifications._registered_commands[command]["description"]}'
+
+    custom_commands = any(map(lambda x: x not in Pytifications._default_commands,Pytifications._registered_commands.keys()))
+
+    if custom_commands:
+        message += "\n\nCustom commands:"
+
+    for command in Pytifications._registered_commands:
+        if command in Pytifications._default_commands:
+            continue
+        message += f'\n\n -> command: {command}\n      description: {Pytifications._registered_commands[command]["description"]}'
+
+    options = Pytifications._options
+    custom_options = PytificationsOptions()
+    Pytifications.set_options(custom_options)
+    Pytifications.send_message(message)
+    Pytifications.set_options(options)
+
+
 class Pytifications:
     _login = None
     _logged_in = False
@@ -284,6 +311,13 @@ class Pytifications:
     _registered_callbacks = {
         "__set_message_id":{"function":lambda *args: Pytifications._add_to_message_pool(update_message_id,*args),"args":[]}
     }
+    _registered_commands = {
+        "check_commands":{"function":send_registered_commands,"description":"shows the available commands for this script"}
+    }
+    _default_commands = [
+        "check_commands"
+    ]
+    _commands_to_call_synchronous = []
     _message_pool: SimpleQueue[InternalPytificationsQueuedTask] = SimpleQueue()
     _last_message_id = 0
     _process_id = 0
@@ -291,26 +325,52 @@ class Pytifications:
     _synchronous = False
     _options = PytificationsOptions()
 
+
+
     @staticmethod
     def _add_to_message_pool(function,*args):
         task = InternalPytificationsQueuedTask(function,[],args)
         Pytifications._message_pool.put(task)
 
         return task
+    
+    @staticmethod
+    def add_command_handler(command: str,function,description=""):
+        """
+        Use this method to add a command handler that can be called from the conversation as !my_script_alias my_command
+
+        The function will receive a string containing any other arguments that were passed in the conversation or an empty string if only the command was passed
+        
+        Args:
+            :obj:`str` the command as a string that will be registered
+
+            :obj:`function(str)` the callback function to be called
+
+            :obj:`str` description of the command (optional)
+        """
+
+        Pytifications._registered_commands[command] = {"function":function,"description":description}
+
+
+        
 
     @staticmethod
-    def run_callbacks_sync():
+    def run_events_sync():
         """
-        Use this method to run all the callbacks that were registered to be called since last time you called this function or started the process
+        Use this method to run all the callbacks/commands that were registered to be called since last time you called this function or started the process
         
         Returns:
-            :obj:`True` if any callbacks where called, :obj:`False` otherwise
+            :obj:`True` if any callbacks/commands where called, :obj:`False` otherwise
         """
         
         called_any = False
         for callback in Pytifications._callbacks_to_call_synchronous:
             called_any = True
             callback["function"](*callback["args"])
+        for command in Pytifications._commands_to_call_synchronous:
+            called_any = True
+            command["function"](command["args"])
+        Pytifications._commands_to_call_synchronous.clear()
         Pytifications._callbacks_to_call_synchronous.clear()
 
         return called_any
@@ -319,6 +379,8 @@ class Pytifications:
     def set_options(options: PytificationsOptions):
         """
         Sets the options to use during the script operation,
+
+        Make sure to call before the login method to ensure that all options are followed
         
         for more information on the available options check :obj:`PytificationsOptions`
         """
@@ -422,7 +484,15 @@ class Pytifications:
                         })
                     else:
                         Pytifications._registered_callbacks[item["function"]]["function"](*(Pytifications._registered_callbacks[item['function']]['args'] + item["args"]))
-                
+                for item in commands:
+                    if item['command'] in Pytifications._registered_commands:
+                        if Pytifications._synchronous:
+                                Pytifications._commands_to_call_synchronous.append({
+                                    "function":Pytifications._registered_commands[item['command']]["function"],
+                                    "args":item['args']
+                                })
+                        else:
+                            Pytifications._registered_commands[item['command']]["function"](item['args'])
 
 
 

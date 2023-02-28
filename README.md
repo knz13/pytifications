@@ -22,28 +22,28 @@ After that just import the library like so
     #use your credentials created at the bot
     Pytifications.login("myUsername","myPassword")
 
-    #and send!
+    #and send any message you wish!
     Pytifications.send_message("hello from python!")
 
-## Extra features
+# Core features
 
-* Sending images
+## Options
 
+there are a few options that can be set inside the code (preferably before the login method in order to setup everything) which you can call like this
 ```
-from pytifications import Pytifications
-from PIL import Image
-
-#login and etc...
-
-Pytifications.send_message("hi! i have a photo with me :D",photo=Image.open("image_location.png"))
-
+Pytifications.set_options(PytificationsOptions(
+    send_app_run_time_on_message=True,
+    send_current_time_on_message=True,
+    script_alias="my_script"
+))
 ```
 
-* Callbacks
+the script alias will be used many times so choose the alias wisely :D
 
+## Callbacks
+
+every message can be sent with buttons attached so you can be responsive with your messages
 ```
-#every message can be sent with buttons attached so you can be responsive with your messages
-
 from pytifications import Pytifications,PytificationButton
 
 #login and etc...
@@ -74,10 +74,38 @@ Pytifications.send_message('hi!',buttons=[
 Pytifications.set_synchronous()
 
 #then just call this method in the main loop of your program when you wish the callbacks to be called
-Pytifications.run_callbacks_sync()
+Pytifications.run_events_sync()
 
 ```
-* Editing messages
+## Conversational commands
+
+If the buttons don't suit your needs for interactability, you can create commands by calling the following method somewhere in your code (preferably at the start)
+```
+
+#creating the callback method, it will receive a string containing any extra arguments passed in the message
+def my_callback_function(extra_args):
+    #custom code goes here
+    print(extra_args)
+
+#then register it
+Pytifications.add_command_handler(
+        command="my_custom_command",
+        function=my_callback_function,
+        description="my custom description!"
+)
+```
+Then you can use the chat commands that can be called from the conversation by sending the following message in a chat that the Pytificator bot is in:
+```
+!my_script_alias my_custom_command [extra_optional_args]
+```
+
+To check which commands are available for your script you can use the following command in the chat:
+```
+!my_script_alias check_commands
+```
+
+## Editing messages
+every message can be edited after being sent, which you can use to avoid spamming many messages, to update graphs, to update your coworkers instantly and much more!
 ```
 message = Pytifications.send_message('message sent from Pytifications!')
 
@@ -100,8 +128,8 @@ message.edit(buttons=[
 
 ```
 
-
-* Edit last message
+## Edit last message
+if you lost the message object you last sent, you can always call the edit_last_message method to edit it!
 ```
 from pytifications import Pytifications
 
@@ -127,6 +155,21 @@ Pytifications.edit_last_message("now with buttons!",buttons=[
     ]
 ])
 ```
+
+## Sending images
+
+many times it might be useful to send images together with your message (such as sending graphs, script results and such) so we've addressed this need too!
+
+```
+from pytifications import Pytifications
+from PIL import Image
+
+#login and etc...
+
+Pytifications.send_message("hi! i have a photo with me :D",photo=Image.open("image_location.png"))
+
+```
+
 
 
     
