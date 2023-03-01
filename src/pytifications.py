@@ -578,7 +578,7 @@ class Pytifications:
         Used for the inside logic to check if any callbacks or commands to be called
         """
         while True:
-            time.sleep(1)
+            time.sleep(0.25)
             if not Pytifications.am_i_logged_in():
                 continue
             
@@ -590,7 +590,7 @@ class Pytifications:
                 print(f'Error found while updating message pool, please report to the developer! {e}')
                 pass
 
-            time.sleep(1)
+            time.sleep(0.25)
             try:
                 res = requests.get('https://pytifications.herokuapp.com/get_callbacks',json={
                     "username":Pytifications._login,
