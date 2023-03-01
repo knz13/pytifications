@@ -577,7 +577,7 @@ class Pytifications:
                 print(f'Error found while updating message pool, please report to the developer! {e}')
                 pass
 
-            time.sleep(2)
+            time.sleep(0.5)
             try:
                 res = requests.get('https://pytifications.herokuapp.com/get_callbacks',json={
                     "username":Pytifications._login,
