@@ -59,10 +59,20 @@ class InternalPytificationsQueuedTask:
             queued_task.evaluate()
 
 
-@dataclass
 class PytificationButton:
-    text: str
-    callback: Callable
+    def __init__(self,text:str,callback,*extra_args) -> None:
+        """
+        A class that represents the buttons to be passed in the message requests
+
+        Args:
+
+            text: :obj:`str` the text inside the button
+
+            callback: :obj:`function(message,*args)` the function to be passed as a callback to when the button is pressed. The function receives a message object followed by whatever parameters are passed as an extra to this function
+        """
+        self.text = text
+        self.callback = callback
+        self.extra_args = extra_args
 
 class PytificationsMessageWithPhoto:
     def __init__(self,message_id,image = None):
@@ -104,7 +114,7 @@ class PytificationsMessageWithPhoto:
         text = Pytifications._options.format_string(text)
         buttons,buttons_list = buttons_transform(buttons)
         for button in buttons_list:
-            Pytifications._registered_callbacks[button.callback.__name__] = {"function":button.callback,"args":[self]}
+            Pytifications._registered_callbacks[button.callback.__name__] = {"function":button.callback,"args":[self,*button.extra_args]}
         
 
         request_data = {
@@ -165,7 +175,7 @@ class PytificationsMessage:
         text = Pytifications._options.format_string(text)
         buttons,buttons_list = buttons_transform(buttons)
         for button in buttons_list:
-            Pytifications._registered_callbacks[button.callback.__name__] = {"function":button.callback,"args":[self]}
+            Pytifications._registered_callbacks[button.callback.__name__] = {"function":button.callback,"args":[self,*button.extra_args]}
         
 
         request_data = {
@@ -291,7 +301,7 @@ class PytificationsOptions:
             string = f'{string}\nrun_time:\n{datetime_diff(datetime.datetime.now(pytz.UTC) - PytificationsOptions._start_time)}'
         if self._send_current_time_on_message:
             string = f'{string}\ncurrent_time:\n{(datetime.datetime.now(pytz.UTC) + Pytifications._prefered_timezone).strftime("%H:%M:%S")}'
-        
+
         if self._script_alias != "":
             string = f'Message sent from "{self._script_alias}":\n\n{string}'
         
@@ -631,7 +641,7 @@ class Pytifications:
 
         buttons,buttons_list = buttons_transform(buttons)
         for button in buttons_list:
-            Pytifications._registered_callbacks[button.callback.__name__] = {"function":button.callback,"args":[return_data]}
+            Pytifications._registered_callbacks[button.callback.__name__] = {"function":button.callback,"args":[return_data,*button.extra_args]}
         
 
         request_data = {
@@ -662,7 +672,7 @@ class Pytifications:
 
         buttons,buttons_list = buttons_transform(buttons)
         for button in buttons_list:
-            Pytifications._registered_callbacks[button.callback.__name__] = {"function":button.callback,"args":[message_return]}
+            Pytifications._registered_callbacks[button.callback.__name__] = {"function":button.callback,"args":[message_return,*button.extra_args]}
         
         request_data = {
             "username":Pytifications._login,
