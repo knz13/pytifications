@@ -1,5 +1,6 @@
 
 import datetime
+import random
 from typing import List,Callable
 import pytz
 import requests
@@ -7,13 +8,14 @@ import hashlib
 import sys
 import asyncio
 from dataclasses import dataclass
-from threading import Thread
+from threading import Lock, Thread
 from PIL import Image
 import numpy as np
 from queue import SimpleQueue
 import io
 from contextlib import contextmanager
 import time
+from hashlib import sha256
 
 
 
@@ -34,8 +36,9 @@ def buttons_transform(buttons):
         for column in row:
             
             
+            column._id = sha256(f'{random.random()}'.encode('utf-8')).hexdigest()[:12]
             rowButtons.append({
-                "callback_name":column.callback.__name__,
+                "button_id":column._id,
                 "text":column.text
             })
             actual_buttons.append(column)
@@ -52,7 +55,7 @@ class InternalPytificationsQueuedTask:
         self._function = function
         self._extra_functions = extra_functions
         self._args = args
-    
+
     def evaluate(self):
         self._function(*self._args)
         for queued_task in self._extra_functions:
@@ -73,6 +76,7 @@ class PytificationButton:
         self.text = text
         self.callback = callback
         self.extra_args = extra_args
+        self._id = ""
 
 class PytificationsMessageWithPhoto:
     def __init__(self,message_id,image = None):
@@ -113,9 +117,10 @@ class PytificationsMessageWithPhoto:
 
         text = Pytifications._options.format_string(text)
         buttons,buttons_list = buttons_transform(buttons)
+
         for button in buttons_list:
-            Pytifications._registered_callbacks[button.callback.__name__] = {"function":button.callback,"args":[self,*button.extra_args]}
-        
+            Pytifications._registered_callbacks[button._id] = {"function":button.callback,"args":[self,*button.extra_args]}
+
 
         request_data = {
             "username":Pytifications._login,
@@ -175,7 +180,7 @@ class PytificationsMessage:
         text = Pytifications._options.format_string(text)
         buttons,buttons_list = buttons_transform(buttons)
         for button in buttons_list:
-            Pytifications._registered_callbacks[button.callback.__name__] = {"function":button.callback,"args":[self,*button.extra_args]}
+            Pytifications._registered_callbacks[button._id] = {"function":button.callback,"args":[self,*button.extra_args]}
         
 
         request_data = {
@@ -206,7 +211,7 @@ class PytificationsRemoteController:
     
 
 def update_message_id(old_message_id,new_message_id):
-
+    print(f'updating messages!')
 
     for i in alive_messages:
         if int(i._message_id) == int(old_message_id):
@@ -414,6 +419,8 @@ class Pytifications:
     _callbacks_to_call_synchronous = []
     _synchronous = False
     _options = PytificationsOptions()
+    _commands_mutex = Lock()
+    _callbacks_mutex = Lock()
 
 
 
@@ -462,15 +469,21 @@ class Pytifications:
         """
         
         called_any = False
-        for callback in Pytifications._callbacks_to_call_synchronous:
-            called_any = True
-            callback["function"](*callback["args"])
-        for command in Pytifications._commands_to_call_synchronous:
-            if command["command_name"] not in Pytifications._default_commands:
+        if Pytifications._callbacks_mutex.acquire(blocking=False):
+            for callback in Pytifications._callbacks_to_call_synchronous:
                 called_any = True
-            command["function"](command["args"])
-        Pytifications._commands_to_call_synchronous.clear()
-        Pytifications._callbacks_to_call_synchronous.clear()
+                callback["function"](*callback["args"])
+            Pytifications._callbacks_to_call_synchronous.clear()
+            Pytifications._callbacks_mutex.release()
+        if Pytifications._commands_mutex.acquire(blocking=False):
+            for command in Pytifications._commands_to_call_synchronous:
+                if command["command_name"] not in Pytifications._default_commands:
+                    called_any = True
+                command["function"](command["args"])
+            Pytifications._commands_to_call_synchronous.clear()
+            Pytifications._commands_mutex.release()
+        
+        
 
         return called_any
     
@@ -552,20 +565,20 @@ class Pytifications:
 
             print(f'success logging in to pytifications! script id = {Pytifications._process_id}')
 
-        Thread(target=Pytifications._check_if_any_events_called,daemon=True).start()
+        Thread(target=Pytifications._check_if_any_events_called,daemon=True,args=(Pytifications._callbacks_mutex,Pytifications._commands_mutex)).start()
         
         return True
 
     
     @staticmethod
-    def _check_if_any_events_called():
+    def _check_if_any_events_called(callback_lock,command_lock):
         """
         INTERNAL
         
         Used for the inside logic to check if any callbacks or commands to be called
         """
         while True:
-            time.sleep(0.5)
+            time.sleep(1)
             if not Pytifications.am_i_logged_in():
                 continue
             
@@ -577,7 +590,7 @@ class Pytifications:
                 print(f'Error found while updating message pool, please report to the developer! {e}')
                 pass
 
-            time.sleep(0.5)
+            time.sleep(1)
             try:
                 res = requests.get('https://pytifications.herokuapp.com/get_callbacks',json={
                     "username":Pytifications._login,
@@ -592,20 +605,25 @@ class Pytifications:
                 commands,callbacks = json['commands'],json['callbacks']
                 for item in callbacks:
                     if Pytifications._synchronous:
-                        Pytifications._callbacks_to_call_synchronous.append({
-                            "function":Pytifications._registered_callbacks[item["function"]]["function"],
-                            "args":(Pytifications._registered_callbacks[item['function']]['args'] + item["args"])
-                        })
+                        #print(f'registered_callbacks = {Pytifications._registered_callbacks}')
+                        #print(f'got json = {callbacks}')
+                        with Pytifications._callbacks_mutex:
+                            Pytifications._callbacks_to_call_synchronous.append({
+                                "function":Pytifications._registered_callbacks[item["button_id"]]["function"],
+                                "args":(Pytifications._registered_callbacks[item['button_id']]['args'] + item["args"])
+                            })
+                        #print(Pytifications._callbacks_to_call_synchronous)
                     else:
-                        Pytifications._registered_callbacks[item["function"]]["function"](*(Pytifications._registered_callbacks[item['function']]['args'] + item["args"]))
+                        Pytifications._registered_callbacks[item["button_id"]]["function"](*(Pytifications._registered_callbacks[item['button_id']]['args'] + item["args"]))
                 for item in commands:
                     if item['command'] in Pytifications._registered_commands:
                         if Pytifications._synchronous:
-                                Pytifications._commands_to_call_synchronous.append({
-                                    "function":Pytifications._registered_commands[item['command']]["function"],
-                                    "args":item['args'],
-                                    "command_name":item["command"]
-                                })
+                                with Pytifications._commands_mutex:
+                                    Pytifications._commands_to_call_synchronous.append({
+                                        "function":Pytifications._registered_commands[item['command']]["function"],
+                                        "args":item['args'],
+                                        "command_name":item["command"]
+                                    })
                         else:
                             Pytifications._registered_commands[item['command']]["function"](item['args'])
                     else:
@@ -641,7 +659,7 @@ class Pytifications:
 
         buttons,buttons_list = buttons_transform(buttons)
         for button in buttons_list:
-            Pytifications._registered_callbacks[button.callback.__name__] = {"function":button.callback,"args":[return_data,*button.extra_args]}
+            Pytifications._registered_callbacks[button._id] = {"function":button.callback,"args":[return_data,*button.extra_args]}
         
 
         request_data = {
@@ -672,7 +690,7 @@ class Pytifications:
 
         buttons,buttons_list = buttons_transform(buttons)
         for button in buttons_list:
-            Pytifications._registered_callbacks[button.callback.__name__] = {"function":button.callback,"args":[message_return,*button.extra_args]}
+            Pytifications._registered_callbacks[button._id] = {"function":button.callback,"args":[message_return,*button.extra_args]}
         
         request_data = {
             "username":Pytifications._login,
