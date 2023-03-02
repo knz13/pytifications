@@ -1,6 +1,8 @@
 
 import datetime
+import logging
 import random
+from traceback import format_exception, format_tb
 from typing import List,Callable
 import pytz
 import requests
@@ -251,6 +253,7 @@ class PytificationsOptions:
     def no_update_in_server():
         """
         INTERNAL
+        
         Helper decorator to avoid updating the alias of the script when inside the with statement
         """
         try:
@@ -263,19 +266,21 @@ class PytificationsOptions:
     @contextmanager
     def default_options():
         """
-        Helper decorator to keep the default options while inside the with statement
+        INTERNAL
+
+        Helper decorator to keep the default options while inside the with statement without sending alias
         """
         current_options = Pytifications._options
         
         with PytificationsOptions.no_update_in_server() as c:
             try:
-                Pytifications.set_options(PytificationsOptions())
+                Pytifications.set_options(PytificationsOptions(should_send_script_alias=False))
                 yield None
             finally:
                 Pytifications.set_options(current_options)
 
 
-    def __init__(self,send_current_time_on_message=False,send_app_run_time_on_message = False,script_alias = "",should_print_sent_messages=False) -> None:
+    def __init__(self,send_current_time_on_message=False,send_app_run_time_on_message = False,script_alias = "",should_print_sent_messages=False,should_send_script_alias=True) -> None:
         """
         Data class for the options in Pytifications
 
@@ -287,12 +292,17 @@ class PytificationsOptions:
             script_alias: (:obj:`str`) alias to use when sending the message. Any spaces will be replaced with an underscore. Will appear on the top of the messages as "Message sent from __alias_here__:"  and will be used to send commands to your script
         
             should_print_sent_messages: (:obj:`bool`) whether to print to console when a message is sent
+
+            should_send_script_alias: (:obj:`bool`) wether to send the alias of the script at the top of every message
         """
         
         self._send_app_run_time_on_message = send_app_run_time_on_message
         self._script_alias = script_alias.replace(" ","_")
+        self._script_alias = hashlib.sha256(sys.argv[0].encode('utf-8')).hexdigest()[:10] if script_alias == "" else script_alias
+
         self._send_current_time_on_message = send_current_time_on_message
         self._should_print_sent_messages = should_print_sent_messages
+        self._should_send_script_alias = should_send_script_alias
         
     
 
@@ -307,7 +317,7 @@ class PytificationsOptions:
         if self._send_current_time_on_message:
             string = f'{string}\ncurrent_time:\n{(datetime.datetime.now(pytz.UTC) + Pytifications._prefered_timezone).strftime("%H:%M:%S")}'
 
-        if self._script_alias != "":
+        if self._should_send_script_alias:
             string = f'Message sent from "{self._script_alias}":\n\n{string}'
         
         return string
@@ -326,7 +336,7 @@ def send_message(request_data,photo: Image,return_data: PytificationsMessage | P
         
 
         if res.status_code != 200:
-            print(f'could not send message. reason: {res.reason}')
+            print(f'could not send message. reason: {res.text}')
             return False
 
         Pytifications._last_message_id = int(res.text)
@@ -349,7 +359,11 @@ def edit_message(request_data,return_data: PytificationsMessage | PytificationsM
         return
     with PytificationsOptions.with_custom_options(current_options):
         try:     
-            requests.patch('https://pytifications.herokuapp.com/edit_message',json=request_data)
+            res = requests.patch('https://pytifications.herokuapp.com/edit_message',json=request_data)
+
+            if res.status_code != 200:
+                print(f'could not edit message. reason: {res.text}')
+                return False
         except Exception as e:
             print(f'Found exception while editing message: {e}')
             return False
@@ -497,7 +511,7 @@ class Pytifications:
         for more information on the available options check :obj:`PytificationsOptions`
         """
         if Pytifications._logged_in and PytificationsOptions._should_update_in_server and options._script_alias != Pytifications._options._script_alias:
-            requests.patch("https://pytifications.herokuapp.com/update_process_name",json={
+            requests.patch("https://pytifications.herokuapp.com/update_options._script_alias",json={
                 "username":Pytifications._login,
                 "password_hash":hashlib.sha256(Pytifications._password.encode('utf-8')).hexdigest(),
                 "process_id":Pytifications._process_id,
@@ -539,13 +553,16 @@ class Pytifications:
             :obj:`True`if login was successful else :obj:`False`
         """
 
+        
+
         Pytifications._logged_in = False
+
 
         try:
             res = requests.post('https://pytifications.herokuapp.com/initialize_script',json={
                 "username":login,
                 "password_hash":hashlib.sha256(password.encode('utf-8')).hexdigest(),
-                "process_name":hashlib.sha256(sys.argv[0].encode('utf-8')).hexdigest()[:10] if Pytifications._options._script_alias == "" else Pytifications._options._script_alias,
+                "process_name":Pytifications._options._script_alias,
                 "process_language":'python'
             })
         except Exception as e:
@@ -565,10 +582,22 @@ class Pytifications:
 
             print(f'success logging in to pytifications! script id = {Pytifications._process_id}')
 
+        sys.excepthook = Pytifications._handle_global_exceptions
+
         Thread(target=Pytifications._check_if_any_events_called,daemon=True,args=(Pytifications._callbacks_mutex,Pytifications._commands_mutex)).start()
         
         return True
-
+    
+    @staticmethod
+    def _handle_global_exceptions(e_type, e_value, e_traceback):
+        logging.getLogger(__name__).critical("Unhandled exception", exc_info=(e_type, e_value, e_traceback))
+        with PytificationsOptions.default_options():
+            Pytifications.send_message(f'An error ocurred in script/application with alias "{Pytifications._options._script_alias}":\n\nError type: {e_type}\n\nError value: {e_value}\n\nTraceback: {"".join(format_tb(e_traceback))}')
+            while not Pytifications._message_pool.empty():
+                try:
+                    Pytifications._message_pool.get().evaluate()
+                except Exception as e:
+                    pass
     
     @staticmethod
     def _check_if_any_events_called(callback_lock,command_lock):
@@ -582,13 +611,12 @@ class Pytifications:
             if not Pytifications.am_i_logged_in():
                 continue
             
-            try:
-                while not Pytifications._message_pool.empty():
+            while not Pytifications._message_pool.empty():
+                try:
                     Pytifications._message_pool.get().evaluate()
-                    
-            except Exception as e:
-                print(f'Error found while updating message pool, please report to the developer! {e}')
-                pass
+                except Exception as e:
+                    print(f'Error found while updating message pool, please report to the developer! {e}')
+                    pass
 
             time.sleep(1)
             try:
