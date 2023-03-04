@@ -129,7 +129,8 @@ class PytificationsMessageWithPhoto:
             "password_hash":hashlib.sha256(Pytifications._password.encode('utf-8')).hexdigest(),
             "message_id":self._message_id,
             "buttons":buttons,
-            "process_id":Pytifications._process_id
+            "process_id":Pytifications._process_id,
+            "user_id":Pytifications._user_id
         }
 
         if photo != None:
@@ -190,7 +191,8 @@ class PytificationsMessage:
             "password_hash":hashlib.sha256(Pytifications._password.encode('utf-8')).hexdigest(),
             "message_id":self._message_id,
             "buttons":buttons,
-            "process_id":Pytifications._process_id
+            "process_id":Pytifications._process_id,
+            "user_id":Pytifications._user_id
         }
 
         
@@ -731,7 +733,8 @@ class Pytifications:
                 "password_hash":hashlib.sha256(Pytifications._password.encode('utf-8')).hexdigest(),
                 "message":message,
                 "buttons":buttons,
-                "process_id":Pytifications._process_id
+                "process_id":Pytifications._process_id,
+                "user_id":Pytifications._user_id
         }
 
         if photo != None:
@@ -761,7 +764,8 @@ class Pytifications:
             "password_hash":hashlib.sha256(Pytifications._password.encode('utf-8')).hexdigest(),
             "message_id":Pytifications._last_message_id,
             "buttons":buttons,
-            "process_id":Pytifications._process_id
+            "process_id":Pytifications._process_id,
+            "user_id":Pytifications._user_id
         }
 
         
