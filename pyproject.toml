@@ -1,9 +1,10 @@
 [build-system]
 requires = ["setuptools>=61.0","requests"]
 build-backend = "setuptools.build_meta"
+
 [project]
 name = "pytifications"
-version = "0.0.38"
+version = "0.0.39"
 authors = [
   { name="Knz13", email="otaviomaya@gmail.com" },
 ]
@@ -15,6 +16,7 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
+
 
 [project.urls]
 "Homepage" = "https://github.com/knz13/pytifications"

@@ -10,7 +10,7 @@ import hashlib
 import sys
 import asyncio
 from dataclasses import dataclass
-from threading import Lock, Thread
+from threading import Lock, Thread,Event
 from PIL import Image
 import numpy as np
 from queue import SimpleQueue
@@ -18,7 +18,7 @@ import io
 from contextlib import contextmanager
 import time
 from hashlib import sha256
-
+from secrets import token_hex
 
 
 
@@ -38,7 +38,7 @@ def buttons_transform(buttons):
         for column in row:
             
             
-            column._id = sha256(f'{random.random()}'.encode('utf-8')).hexdigest()[:12]
+            column._id = token_hex(6)
             rowButtons.append({
                 "button_id":column._id,
                 "text":column.text
@@ -207,6 +207,7 @@ class PytificationsMessage:
 
 
 class PytificationsRemoteController:
+    _instance = None
     def __init__(self,name) -> None:
         pass
 
@@ -253,7 +254,7 @@ class PytificationsOptions:
     def no_update_in_server():
         """
         INTERNAL
-        
+
         Helper decorator to avoid updating the alias of the script when inside the with statement
         """
         try:
@@ -298,7 +299,7 @@ class PytificationsOptions:
         
         self._send_app_run_time_on_message = send_app_run_time_on_message
         self._script_alias = script_alias.replace(" ","_")
-        self._script_alias = hashlib.sha256(sys.argv[0].encode('utf-8')).hexdigest()[:10] if script_alias == "" else script_alias
+        self._script_alias = token_hex(6) if script_alias == "" else script_alias
 
         self._send_current_time_on_message = send_current_time_on_message
         self._should_print_sent_messages = should_print_sent_messages
@@ -435,7 +436,10 @@ class Pytifications:
     _options = PytificationsOptions()
     _commands_mutex = Lock()
     _callbacks_mutex = Lock()
-
+    _background_thread_event = Event()
+    _background_thread = None
+    _traceback_message = ""
+    _user_id = 0
 
 
     @staticmethod
@@ -511,11 +515,12 @@ class Pytifications:
         for more information on the available options check :obj:`PytificationsOptions`
         """
         if Pytifications._logged_in and PytificationsOptions._should_update_in_server and options._script_alias != Pytifications._options._script_alias:
-            requests.patch("https://pytifications.herokuapp.com/update_options._script_alias",json={
+            requests.patch("https://pytifications.herokuapp.com/update_process_name",json={
                 "username":Pytifications._login,
                 "password_hash":hashlib.sha256(Pytifications._password.encode('utf-8')).hexdigest(),
                 "process_id":Pytifications._process_id,
-                "process_name":options._script_alias
+                "process_name":options._script_alias,
+                "user_id":Pytifications._process_id
             })
         Pytifications._options = options
     
@@ -563,7 +568,7 @@ class Pytifications:
                 "username":login,
                 "password_hash":hashlib.sha256(password.encode('utf-8')).hexdigest(),
                 "process_name":Pytifications._options._script_alias,
-                "process_language":'python'
+                "process_language":'python',
             })
         except Exception as e:
             print(f'Found exception while logging in: {e}')
@@ -578,38 +583,59 @@ class Pytifications:
             json = res.json()
             Pytifications._logged_in = True
             Pytifications._process_id = json['id']
+            Pytifications._user_id = json['user_id']
             Pytifications._prefered_timezone = datetime.timedelta(hours=json['prefered_timezone'])
 
             print(f'success logging in to pytifications! script id = {Pytifications._process_id}')
 
         sys.excepthook = Pytifications._handle_global_exceptions
 
-        Thread(target=Pytifications._check_if_any_events_called,daemon=True,args=(Pytifications._callbacks_mutex,Pytifications._commands_mutex)).start()
+        Pytifications._background_thread = Thread(target=Pytifications._check_if_any_events_called,daemon=True,args=(Pytifications._background_thread_event,Pytifications._callbacks_mutex,Pytifications._commands_mutex))
+        Pytifications._background_thread.start()
         
         return True
     
     @staticmethod
     def _handle_global_exceptions(e_type, e_value, e_traceback):
         logging.getLogger(__name__).critical("Unhandled exception", exc_info=(e_type, e_value, e_traceback))
-        with PytificationsOptions.default_options():
-            Pytifications.send_message(f'An error ocurred in script/application with alias "{Pytifications._options._script_alias}":\n\nError type: {e_type}\n\nError value: {e_value}\n\nTraceback: {"".join(format_tb(e_traceback))}')
-            while not Pytifications._message_pool.empty():
-                try:
-                    Pytifications._message_pool.get().evaluate()
-                except Exception as e:
-                    pass
+        if Pytifications.am_i_logged_in():
+            Pytifications._traceback_message = f'An error ocurred in script/application with alias "{Pytifications._options._script_alias}":\n\nError type: {e_type}\n\nError value: {e_value}\n\nTraceback: {"".join(format_tb(e_traceback))}'
+            Pytifications._background_thread_event.set()
+            while Pytifications._background_thread.is_alive():
+                pass
     
     @staticmethod
-    def _check_if_any_events_called(callback_lock,command_lock):
+    def _check_if_any_events_called(stop_event: Event,callback_lock,command_lock):
         """
         INTERNAL
         
         Used for the inside logic to check if any callbacks or commands to be called
         """
         while True:
+            if not Pytifications.am_i_logged_in():
+                continue
+            if stop_event.is_set():
+                requests.post('https://pytifications.herokuapp.com/delete_process',json={
+                    "username":Pytifications._login,
+                    "password_hash":hashlib.sha256(Pytifications._password.encode('utf-8')).hexdigest(),
+                    "process_id":Pytifications._process_id,
+                    "traceback_message":Pytifications._traceback_message,
+                    "user_id":Pytifications._user_id
+                })
+                break
+
             time.sleep(1)
             if not Pytifications.am_i_logged_in():
                 continue
+            if stop_event.is_set():
+                requests.post('https://pytifications.herokuapp.com/delete_process',json={
+                    "username":Pytifications._login,
+                    "password_hash":hashlib.sha256(Pytifications._password.encode('utf-8')).hexdigest(),
+                    "process_id":Pytifications._process_id,
+                    "traceback_message":Pytifications._traceback_message,
+                    "user_id":Pytifications._user_id
+                })
+                break
             
             while not Pytifications._message_pool.empty():
                 try:
@@ -619,11 +645,21 @@ class Pytifications:
                     pass
 
             time.sleep(1)
+            if stop_event.is_set():
+                requests.post('https://pytifications.herokuapp.com/delete_process',json={
+                    "username":Pytifications._login,
+                    "password_hash":hashlib.sha256(Pytifications._password.encode('utf-8')).hexdigest(),
+                    "process_id":Pytifications._process_id,
+                    "traceback_message":Pytifications._traceback_message,
+                    "user_id":Pytifications._user_id
+                })
+                break
             try:
                 res = requests.get('https://pytifications.herokuapp.com/get_callbacks',json={
                     "username":Pytifications._login,
                     "password_hash":hashlib.sha256(Pytifications._password.encode('utf-8')).hexdigest(),
-                    "process_id":Pytifications._process_id
+                    "process_id":Pytifications._process_id,
+                    "user_id":Pytifications._user_id
                 })
             except Exception as e:
                 print(f'Error found while requesting to get callbacks, please contact the developer! {e}')
@@ -635,7 +671,7 @@ class Pytifications:
                     if Pytifications._synchronous:
                         #print(f'registered_callbacks = {Pytifications._registered_callbacks}')
                         #print(f'got json = {callbacks}')
-                        with Pytifications._callbacks_mutex:
+                        with callback_lock:
                             Pytifications._callbacks_to_call_synchronous.append({
                                 "function":Pytifications._registered_callbacks[item["button_id"]]["function"],
                                 "args":(Pytifications._registered_callbacks[item['button_id']]['args'] + item["args"])
@@ -646,7 +682,7 @@ class Pytifications:
                 for item in commands:
                     if item['command'] in Pytifications._registered_commands:
                         if Pytifications._synchronous:
-                                with Pytifications._commands_mutex:
+                                with command_lock:
                                     Pytifications._commands_to_call_synchronous.append({
                                         "function":Pytifications._registered_commands[item['command']]["function"],
                                         "args":item['args'],
@@ -784,4 +820,9 @@ class Pytifications:
         """
         EXPERIMENTAL: DO NOT USE
         """
-        return PytificationsRemoteController(name)
+
+        if PytificationsRemoteController._instance == None:
+            return PytificationsRemoteController(name)
+        else:
+            return PytificationsRemoteController._instance
+    
