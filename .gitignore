@@ -5,3 +5,5 @@ test.py
 .pytest_cache/
 .coverage
 coverage.xml
+build/
+.DS_Store

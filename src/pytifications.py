@@ -19,9 +19,8 @@ from contextlib import contextmanager
 import time
 from hashlib import sha256
 from secrets import token_hex
-
-
-
+from collections import deque
+import atexit
 
 def image_to_byte_array(image: Image.Image) -> str:
   # BytesIO is a fake file stored in memory
@@ -326,6 +325,9 @@ class PytificationsOptions:
         return string
 
 def send_message(request_data,photo: Image,return_data: PytificationsMessage | PytificationsMessageWithPhoto,current_options=None):
+    """ if len(Pytifications._messages_sent_or_edited_in_last_minute) > 30:
+        print(f"In order to preserve our servers, please wait {30} seconds before sending/editing another message")
+         """
     if current_options == None:
         current_options = Pytifications._options
         send_message(request_data,photo,return_data,current_options)
@@ -356,6 +358,9 @@ def send_message(request_data,photo: Image,return_data: PytificationsMessage | P
                 print(f'sent message: "{request_data["message"]}"')
 
 def edit_message(request_data,return_data: PytificationsMessage | PytificationsMessageWithPhoto,current_options=None):
+    """ if len(Pytifications._messages_sent_or_edited_in_last_minute) > 30:
+        print("") """
+    
     if current_options == None:
         current_options = Pytifications._options
         edit_message(request_data,return_data,current_options)
@@ -440,6 +445,7 @@ class Pytifications:
     _callbacks_mutex = Lock()
     _background_thread_event = Event()
     _background_thread = None
+    _messages_sent_or_edited_in_last_minute = deque([])
     _traceback_message = ""
     _user_id = 0
 
@@ -591,6 +597,7 @@ class Pytifications:
             print(f'success logging in to pytifications! script id = {Pytifications._process_id}')
 
         sys.excepthook = Pytifications._handle_global_exceptions
+        atexit.register(Pytifications._on_script_ended)
 
         Pytifications._background_thread = Thread(target=Pytifications._check_if_any_events_called,daemon=True,args=(Pytifications._background_thread_event,Pytifications._callbacks_mutex,Pytifications._commands_mutex))
         Pytifications._background_thread.start()
@@ -605,6 +612,13 @@ class Pytifications:
             Pytifications._background_thread_event.set()
             while Pytifications._background_thread.is_alive():
                 pass
+
+    @staticmethod
+    def _on_script_ended():
+        if Pytifications.am_i_logged_in():
+            Pytifications._background_thread_event.set()
+            while Pytifications._background_thread.is_alive():
+                pass
     
     @staticmethod
     def _check_if_any_events_called(stop_event: Event,callback_lock,command_lock):
@@ -616,6 +630,14 @@ class Pytifications:
         while True:
             if not Pytifications.am_i_logged_in():
                 continue
+
+            while not Pytifications._message_pool.empty():
+                try:
+                    Pytifications._message_pool.get().evaluate()
+                except Exception as e:
+                    print(f'Error found while updating message pool, please report to the developer! {e}')
+                    pass
+            
             if stop_event.is_set():
                 requests.post('https://pytifications.herokuapp.com/delete_process',json={
                     "username":Pytifications._login,
@@ -639,12 +661,7 @@ class Pytifications:
                 })
                 break
             
-            while not Pytifications._message_pool.empty():
-                try:
-                    Pytifications._message_pool.get().evaluate()
-                except Exception as e:
-                    print(f'Error found while updating message pool, please report to the developer! {e}')
-                    pass
+            
 
             time.sleep(1)
             if stop_event.is_set():
@@ -811,7 +828,8 @@ class Pytifications:
             print('could not send pynotification, make sure you have called Pytifications.login("username","password")')
             return False
         return True
-
+    
+    
     @staticmethod
     def am_i_logged_in():
         """
