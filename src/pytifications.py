@@ -610,6 +610,12 @@ class Pytifications:
         if Pytifications.am_i_logged_in():
             Pytifications._traceback_message = f'An error ocurred in script/application with alias "{Pytifications._options._script_alias}":\n\nError type: {e_type}\n\nError value: {e_value}\n\nTraceback: {"".join(format_tb(e_traceback))}'
             Pytifications._background_thread_event.set()
+            while not Pytifications._message_pool.empty():
+                try:
+                    Pytifications._message_pool.get().evaluate()
+                except Exception as e:
+                    print(f'Error found while updating message pool, please report to the developer! {e}')
+                    pass
             while Pytifications._background_thread.is_alive():
                 pass
 
@@ -617,6 +623,12 @@ class Pytifications:
     def _on_script_ended():
         if Pytifications.am_i_logged_in():
             Pytifications._background_thread_event.set()
+            while not Pytifications._message_pool.empty():
+                try:
+                    Pytifications._message_pool.get().evaluate()
+                except Exception as e:
+                    print(f'Error found while updating message pool, please report to the developer! {e}')
+                    pass
             while Pytifications._background_thread.is_alive():
                 pass
     
