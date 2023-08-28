@@ -71,7 +71,7 @@ def test_buttons_transform():
             assert column["callback_name"] == "dummy_callback"
 
 
-    
+
 
 
 

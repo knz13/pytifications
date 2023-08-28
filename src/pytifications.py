@@ -334,7 +334,7 @@ def send_message(request_data,photo: Image,return_data: PytificationsMessage | P
         return
     with PytificationsOptions.with_custom_options(current_options):
         try:
-            res = requests.post('https://pytifications.herokuapp.com/send_message',json=request_data)
+            res = requests.post('https://web-production-65aa.up.railway.app/send_message',json=request_data)
         except Exception as e:
             print(f"Found error when sending message: {e}")
             return False
@@ -367,7 +367,7 @@ def edit_message(request_data,return_data: PytificationsMessage | PytificationsM
         return
     with PytificationsOptions.with_custom_options(current_options):
         try:     
-            res = requests.patch('https://pytifications.herokuapp.com/edit_message',json=request_data)
+            res = requests.patch('https://web-production-65aa.up.railway.app/edit_message',json=request_data)
 
             if res.status_code != 200:
                 print(f'could not edit message. reason: {res.text}')
@@ -523,7 +523,7 @@ class Pytifications:
         for more information on the available options check :obj:`PytificationsOptions`
         """
         if Pytifications._logged_in and PytificationsOptions._should_update_in_server and options._script_alias != Pytifications._options._script_alias:
-            requests.patch("https://pytifications.herokuapp.com/update_process_name",json={
+            requests.patch("https://web-production-65aa.up.railway.app/update_process_name",json={
                 "username":Pytifications._login,
                 "password_hash":hashlib.sha256(Pytifications._password.encode('utf-8')).hexdigest(),
                 "process_id":Pytifications._process_id,
@@ -572,7 +572,7 @@ class Pytifications:
 
 
         try:
-            res = requests.post('https://pytifications.herokuapp.com/initialize_script',json={
+            res = requests.post('https://web-production-65aa.up.railway.app/initialize_script',json={
                 "username":login,
                 "password_hash":hashlib.sha256(password.encode('utf-8')).hexdigest(),
                 "process_name":Pytifications._options._script_alias,
@@ -651,7 +651,7 @@ class Pytifications:
                     pass
             
             if stop_event.is_set():
-                requests.post('https://pytifications.herokuapp.com/delete_process',json={
+                requests.post('https://web-production-65aa.up.railway.app/delete_process',json={
                     "username":Pytifications._login,
                     "password_hash":hashlib.sha256(Pytifications._password.encode('utf-8')).hexdigest(),
                     "process_id":Pytifications._process_id,
@@ -664,7 +664,7 @@ class Pytifications:
             if not Pytifications.am_i_logged_in():
                 continue
             if stop_event.is_set():
-                requests.post('https://pytifications.herokuapp.com/delete_process',json={
+                requests.post('https://web-production-65aa.up.railway.app/delete_process',json={
                     "username":Pytifications._login,
                     "password_hash":hashlib.sha256(Pytifications._password.encode('utf-8')).hexdigest(),
                     "process_id":Pytifications._process_id,
@@ -677,7 +677,7 @@ class Pytifications:
 
             time.sleep(1)
             if stop_event.is_set():
-                requests.post('https://pytifications.herokuapp.com/delete_process',json={
+                requests.post('https://web-production-65aa.up.railway.app/delete_process',json={
                     "username":Pytifications._login,
                     "password_hash":hashlib.sha256(Pytifications._password.encode('utf-8')).hexdigest(),
                     "process_id":Pytifications._process_id,
@@ -686,7 +686,7 @@ class Pytifications:
                 })
                 break
             try:
-                res = requests.get('https://pytifications.herokuapp.com/get_callbacks',json={
+                res = requests.get('https://web-production-65aa.up.railway.app/get_callbacks',json={
                     "username":Pytifications._login,
                     "password_hash":hashlib.sha256(Pytifications._password.encode('utf-8')).hexdigest(),
                     "process_id":Pytifications._process_id,
